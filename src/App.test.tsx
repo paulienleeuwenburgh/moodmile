@@ -39,6 +39,59 @@ afterEach(() => {
   cleanup()
 })
 
+const threeSuggestions: Suggestion[] = [
+  { id: 'hanzo', mascotId: 'comet', name: 'Hanzo', createdAt: '2024-01-01T00:00:00.000Z', votes: 0 },
+  { id: 'yuki', mascotId: 'comet', name: 'Yuki', createdAt: '2024-01-02T00:00:00.000Z', votes: 0 },
+  { id: 'kimi', mascotId: 'comet', name: 'Kimi', createdAt: '2024-01-03T00:00:00.000Z', votes: 0 },
+]
+
+function seedSuggestions(suggestions: Suggestion[]) {
+  localStorage.setItem(SUGGESTIONS_KEY, JSON.stringify(suggestions))
+}
+
+describe('vote targeting', () => {
+  it('voting Hanzo only changes Hanzo', async () => {
+    seedSuggestions(threeSuggestions)
+    render(<App />)
+
+    await userEvent.click(screen.getByRole('button', { name: /vote for hanzo/i }))
+
+    expect(screen.getByRole('button', { name: /remove vote for hanzo/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /vote for yuki/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /vote for kimi/i })).toBeInTheDocument()
+  })
+
+  it('voting Kimi only changes Kimi', async () => {
+    seedSuggestions(threeSuggestions)
+    render(<App />)
+
+    await userEvent.click(screen.getByRole('button', { name: /vote for kimi/i }))
+
+    expect(screen.getByRole('button', { name: /vote for hanzo/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /vote for yuki/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /remove vote for kimi/i })).toBeInTheDocument()
+  })
+
+  it('sorting and re-rendering do not affect vote targeting', async () => {
+    // Yuki starts with 5 votes so it sorts to the top; Hanzo and Kimi have 0
+    const sorted: Suggestion[] = [
+      { ...threeSuggestions[0], votes: 0 },
+      { ...threeSuggestions[1], votes: 5 },
+      { ...threeSuggestions[2], votes: 0 },
+    ]
+    seedSuggestions(sorted)
+    render(<App />)
+
+    // Vote for Hanzo, which is rendered below Yuki due to sort order
+    await userEvent.click(screen.getByRole('button', { name: /vote for hanzo/i }))
+
+    // Only Hanzo should be toggled to voted state; Yuki and Kimi remain unvoted
+    expect(screen.getByRole('button', { name: /remove vote for hanzo/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /remove vote for yuki/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /remove vote for kimi/i })).not.toBeInTheDocument()
+  })
+})
+
 describe('voting', () => {
   it('increments vote count from 0 to 1 on first click', async () => {
     seedSuggestion()
