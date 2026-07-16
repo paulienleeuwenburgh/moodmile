@@ -174,6 +174,61 @@
   border-radius: 10px;
   padding: 0.6rem 0.75rem;
   font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.suggestion-card__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vote-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+  border: 1px solid #c4b6f0;
+  border-radius: 8px;
+  background: #fff;
+  color: #7b3ef7;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  line-height: 1;
+}
+
+.vote-btn:hover {
+  background: #ede6ff;
+  border-color: #7b3ef7;
+}
+
+.vote-btn:focus-visible {
+  outline: 3px solid rgba(123, 62, 247, 0.4);
+  outline-offset: 2px;
+}
+
+.vote-btn--voted {
+  background: linear-gradient(135deg, #7b3ef7, #de3da0);
+  border-color: transparent;
+  color: #fff;
+}
+
+.vote-btn--voted:hover {
+  background: linear-gradient(135deg, #6930e0, #c4328a);
+  color: #fff;
+}
+
+.vote-btn__icon {
+  font-size: 0.65rem;
 }
 
 .suggestion-group__empty {

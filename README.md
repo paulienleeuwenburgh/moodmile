@@ -10,6 +10,10 @@ MoodMile is a React + TypeScript web app for collecting employee mascot name sug
 - Multiple submissions supported
 - Suggestions shown as grouped cards by mascot
 - Suggestions persisted in browser local storage
+- Voting: each suggestion has an upvote button showing the current vote count
+- Vote once per suggestion; click again to revoke your vote
+- Votes persisted in browser local storage to prevent duplicate votes
+- Leaderboard ordering: suggestions are ranked by vote count within each mascot group
 
 ## Run locally
 

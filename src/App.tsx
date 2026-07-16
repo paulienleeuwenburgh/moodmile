@@ -6,6 +6,7 @@ import { SuggestionForm } from './components/SuggestionForm'
 import { mascots } from './data/mascots'
 import type { Suggestion } from './types'
 import { loadSuggestions, saveSuggestions } from './utils/suggestionsStorage'
+import { loadVotedIds, saveVotedIds } from './utils/votesStorage'
 
 const getSuggestionId = () =>
   typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
@@ -15,10 +16,15 @@ const getSuggestionId = () =>
 function App() {
   const [selectedMascotId, setSelectedMascotId] = useState(mascots[0]?.id ?? '')
   const [suggestions, setSuggestions] = useState<Suggestion[]>(() => loadSuggestions())
+  const [votedIds, setVotedIds] = useState<Set<string>>(() => loadVotedIds())
 
   useEffect(() => {
     saveSuggestions(suggestions)
   }, [suggestions])
+
+  useEffect(() => {
+    saveVotedIds(votedIds)
+  }, [votedIds])
 
   const handleSuggestionSubmit = (name: string) => {
     if (!selectedMascotId) {
@@ -32,8 +38,31 @@ function App() {
         mascotId: selectedMascotId,
         name,
         createdAt: new Date().toISOString(),
+        votes: 0,
       },
     ])
+  }
+
+  const handleVote = (suggestionId: string) => {
+    setVotedIds((currentVotedIds) => {
+      const hasVoted = currentVotedIds.has(suggestionId)
+
+      setSuggestions((currentSuggestions) =>
+        currentSuggestions.map((s) =>
+          s.id === suggestionId
+            ? { ...s, votes: hasVoted ? s.votes - 1 : s.votes + 1 }
+            : s,
+        ),
+      )
+
+      const next = new Set(currentVotedIds)
+      if (hasVoted) {
+        next.delete(suggestionId)
+      } else {
+        next.add(suggestionId)
+      }
+      return next
+    })
   }
 
   return (
@@ -65,7 +94,12 @@ function App() {
         onSubmitSuggestion={handleSuggestionSubmit}
       />
 
-      <SuggestionBoard mascots={mascots} suggestions={suggestions} />
+      <SuggestionBoard
+        mascots={mascots}
+        suggestions={suggestions}
+        votedIds={votedIds}
+        onVote={handleVote}
+      />
     </main>
   )
 }

@@ -10,4 +10,5 @@ export interface Suggestion {
   mascotId: string
   name: string
   createdAt: string
+  votes: number
 }
