@@ -1,0 +1,194 @@
+.app-shell {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 2rem 1rem 3rem;
+  display: grid;
+  gap: 1.5rem;
+}
+
+.hero {
+  color: #17122f;
+  background: linear-gradient(135deg, #ffd4ef, #d5f5ff 55%, #e7dcff);
+  border-radius: 20px;
+  padding: 2rem;
+  box-shadow: 0 12px 34px rgba(43, 33, 78, 0.14);
+}
+
+.hero__eyebrow {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #7b3ef7;
+  margin-bottom: 0.75rem;
+}
+
+.hero h1 {
+  margin: 0 0 0.75rem;
+  font-size: clamp(1.75rem, 5vw, 2.65rem);
+}
+
+.hero p {
+  margin: 0;
+  max-width: 64ch;
+}
+
+.mascots {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.mascot-card {
+  border: 2px solid transparent;
+  background: #ffffff;
+  border-radius: 16px;
+  text-align: left;
+  padding: 1rem;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  box-shadow: 0 8px 24px rgba(42, 30, 75, 0.08);
+}
+
+.mascot-card:hover {
+  transform: translateY(-2px);
+}
+
+.mascot-card:focus-visible {
+  outline: 3px solid rgba(123, 62, 247, 0.4);
+  outline-offset: 2px;
+}
+
+.mascot-card--selected {
+  border-color: #7b3ef7;
+  box-shadow: 0 10px 26px rgba(123, 62, 247, 0.23);
+}
+
+.mascot-card__image {
+  width: 68px;
+  height: 68px;
+}
+
+.mascot-card h3 {
+  margin: 0.75rem 0 0.5rem;
+  color: #241a42;
+}
+
+.mascot-card p {
+  margin: 0;
+  color: #51486a;
+}
+
+.suggestion-form {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 1.25rem;
+  box-shadow: 0 8px 24px rgba(42, 30, 75, 0.08);
+  display: grid;
+  gap: 0.9rem;
+}
+
+.suggestion-form h2 {
+  margin: 0;
+  color: #241a42;
+}
+
+.suggestion-form__row {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.suggestion-form label {
+  font-weight: 600;
+  color: #322656;
+}
+
+.suggestion-form input,
+.suggestion-form select,
+.suggestion-form button {
+  border-radius: 10px;
+  border: 1px solid #d9d2ef;
+  padding: 0.7rem 0.8rem;
+  font: inherit;
+}
+
+.suggestion-form button {
+  border: none;
+  background: linear-gradient(135deg, #7b3ef7, #de3da0);
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.suggestion-board {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.suggestion-board h2 {
+  margin: 0;
+  color: #241a42;
+}
+
+.suggestion-board__grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.suggestion-group {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 1rem;
+  box-shadow: 0 8px 24px rgba(42, 30, 75, 0.08);
+}
+
+.suggestion-group header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+}
+
+.suggestion-group header img {
+  width: 36px;
+  height: 36px;
+}
+
+.suggestion-group h3 {
+  margin: 0;
+  color: #241a42;
+}
+
+.suggestion-group ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.suggestion-card {
+  background: #f5f1ff;
+  border: 1px solid #e3d9ff;
+  color: #2f1f58;
+  border-radius: 10px;
+  padding: 0.6rem 0.75rem;
+  font-weight: 500;
+}
+
+.suggestion-group__empty {
+  margin: 0;
+  color: #6b5f8f;
+}
+
+@media (max-width: 768px) {
+  .app-shell {
+    padding: 1rem 0.75rem 2rem;
+  }
+
+  .hero,
+  .suggestion-form,
+  .suggestion-group {
+    padding: 1rem;
+  }
+}
