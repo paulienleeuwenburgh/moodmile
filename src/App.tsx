@@ -44,17 +44,17 @@ function App() {
   }
 
   const handleVote = (suggestionId: string) => {
-    const hasVoted = votedIds.has(suggestionId)
-
-    setSuggestions((currentSuggestions) =>
-      currentSuggestions.map((s) =>
-        s.id === suggestionId
-          ? { ...s, votes: hasVoted ? s.votes - 1 : s.votes + 1 }
-          : s,
-      ),
-    )
-
     setVotedIds((currentVotedIds) => {
+      const hasVoted = currentVotedIds.has(suggestionId)
+
+      setSuggestions((currentSuggestions) =>
+        currentSuggestions.map((s) =>
+          s.id === suggestionId
+            ? { ...s, votes: hasVoted ? s.votes - 1 : s.votes + 1 }
+            : s,
+        ),
+      )
+
       const next = new Set(currentVotedIds)
       if (hasVoted) {
         next.delete(suggestionId)

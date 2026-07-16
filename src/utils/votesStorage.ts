@@ -19,5 +19,9 @@ export function loadVotedIds(): Set<string> {
 }
 
 export function saveVotedIds(votedIds: Set<string>): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify([...votedIds]))
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([...votedIds]))
+  } catch {
+    // ignore storage errors (e.g. QuotaExceededError)
+  }
 }
