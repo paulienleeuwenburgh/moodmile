@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120" fill="none">
+  <defs>
+    <linearGradient id="comet-bg" x1="16" y1="16" x2="104" y2="104" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8D5BFF" />
+      <stop offset="1" stop-color="#5BE7FF" />
+    </linearGradient>
+  </defs>
+  <circle cx="60" cy="60" r="52" fill="url(#comet-bg)"/>
+  <circle cx="44" cy="52" r="5" fill="#1F1638"/>
+  <circle cx="76" cy="52" r="5" fill="#1F1638"/>
+  <path d="M40 75C45 83 53 87 60 87C67 87 75 83 80 75" stroke="#1F1638" stroke-width="6" stroke-linecap="round"/>
+</svg>
