@@ -14,13 +14,18 @@ export function loadSuggestions(): Suggestion[] {
       return []
     }
 
-    return parsed.filter(
-      (item): item is Suggestion =>
-        typeof item?.id === 'string' &&
-        typeof item?.mascotId === 'string' &&
-        typeof item?.name === 'string' &&
-        typeof item?.createdAt === 'string',
-    )
+    return parsed
+      .filter(
+        (item): item is Suggestion =>
+          typeof item?.id === 'string' &&
+          typeof item?.mascotId === 'string' &&
+          typeof item?.name === 'string' &&
+          typeof item?.createdAt === 'string',
+      )
+      .map((item) => ({
+        ...item,
+        votes: typeof item.votes === 'number' ? item.votes : 0,
+      }))
   } catch {
     return []
   }

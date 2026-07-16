@@ -3,9 +3,11 @@ import type { Mascot, Suggestion } from '../types'
 interface SuggestionBoardProps {
   mascots: Mascot[]
   suggestions: Suggestion[]
+  votedIds: Set<string>
+  onVote: (suggestionId: string) => void
 }
 
-export function SuggestionBoard({ mascots, suggestions }: SuggestionBoardProps) {
+export function SuggestionBoard({ mascots, suggestions, votedIds, onVote }: SuggestionBoardProps) {
   return (
     <section className="suggestion-board" aria-label="Suggestions by mascot">
       <h2>Suggestions by mascot</h2>
@@ -13,7 +15,7 @@ export function SuggestionBoard({ mascots, suggestions }: SuggestionBoardProps) 
         {mascots.map((mascot) => {
           const mascotSuggestions = suggestions
             .filter((suggestion) => suggestion.mascotId === mascot.id)
-            .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+            .sort((a, b) => b.votes - a.votes || b.createdAt.localeCompare(a.createdAt))
 
           return (
             <article key={mascot.id} className="suggestion-group">
@@ -25,11 +27,24 @@ export function SuggestionBoard({ mascots, suggestions }: SuggestionBoardProps) 
                 <p className="suggestion-group__empty">No suggestions yet — be the first!</p>
               ) : (
                 <ul>
-                  {mascotSuggestions.map((suggestion) => (
-                    <li key={suggestion.id} className="suggestion-card">
-                      {suggestion.name}
-                    </li>
-                  ))}
+                  {mascotSuggestions.map((suggestion) => {
+                    const hasVoted = votedIds.has(suggestion.id)
+                    return (
+                      <li key={suggestion.id} className="suggestion-card">
+                        <span className="suggestion-card__name">{suggestion.name}</span>
+                        <button
+                          type="button"
+                          className={`vote-btn${hasVoted ? ' vote-btn--voted' : ''}`}
+                          onClick={() => onVote(suggestion.id)}
+                          aria-pressed={hasVoted}
+                          aria-label={hasVoted ? `Remove vote for ${suggestion.name}` : `Vote for ${suggestion.name}`}
+                        >
+                          <span className="vote-btn__icon" aria-hidden="true">▲</span>
+                          <span className="vote-btn__count">{suggestion.votes}</span>
+                        </button>
+                      </li>
+                    )
+                  })}
                 </ul>
               )}
             </article>
