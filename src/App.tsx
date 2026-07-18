@@ -32,16 +32,26 @@ function App() {
       return
     }
 
-    setSuggestions((currentSuggestions) => [
-      ...currentSuggestions,
-      {
-        id: getSuggestionId(),
-        mascotId: selectedMascotId,
-        name,
-        createdAt: new Date().toISOString(),
-        votes: 0,
-      },
-    ])
+    setSuggestions((currentSuggestions) => {
+      const isDuplicate = currentSuggestions.some(
+        (s) =>
+          s.mascotId === selectedMascotId &&
+          s.name.trim().toLowerCase() === name.trim().toLowerCase(),
+      )
+      if (isDuplicate) {
+        return currentSuggestions
+      }
+      return [
+        ...currentSuggestions,
+        {
+          id: getSuggestionId(),
+          mascotId: selectedMascotId,
+          name: name.trim(),
+          createdAt: new Date().toISOString(),
+          votes: 0,
+        },
+      ]
+    })
   }
 
   const handleVote = (suggestionId: string) => {
