@@ -1,5 +1,5 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions'
-import { RestError } from '@azure/data-tables'
+import { RestError, type TableEntityResult } from '@azure/data-tables'
 import { entityToSuggestion, getSuggestionsClient, getVotesClient, SuggestionEntity } from '../tableClient'
 import { escapeODataString } from '../odata'
 
@@ -56,7 +56,7 @@ async function postVote(
 
   // Fetch suggestion to update its vote count
   // rowKey is suggestionId, partitionKey is mascotId — query by RowKey across all partitions
-  let suggestionEntity: import('@azure/data-tables').TableEntityResult<SuggestionEntity> | undefined
+  let suggestionEntity: TableEntityResult<SuggestionEntity> | undefined
   let mascotId: string | undefined
   try {
     let found = false
