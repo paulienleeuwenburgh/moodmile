@@ -1,5 +1,6 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions'
 import { entityToSuggestion, getSuggestionsClient, SuggestionEntity } from '../tableClient'
+import { escapeODataString } from '../odata'
 
 async function getSuggestions(
   _request: HttpRequest,
@@ -34,7 +35,7 @@ async function postSuggestion(
   // Duplicate check: normalise to lowercase and compare
   const normalised = name.toLowerCase()
   for await (const entity of client.listEntities<SuggestionEntity>({
-    queryOptions: { filter: `PartitionKey eq '${mascotId}'` },
+    queryOptions: { filter: `PartitionKey eq '${escapeODataString(mascotId)}'` },
   })) {
     if (entity.name.trim().toLowerCase() === normalised) {
       return {

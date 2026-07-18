@@ -21,7 +21,9 @@ function App() {
         setSuggestions(loadedSuggestions)
         setVotedIds(loadedVotedIds)
       },
-    )
+    ).catch(() => {
+      // Data load failed — the app remains functional with empty state
+    })
   }, [])
 
   const handleSuggestionSubmit = (name: string) => {
@@ -40,10 +42,7 @@ function App() {
     }
 
     // Optimistic: add immediately so the UI responds without waiting for the API round trip.
-    const tempId =
-      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-        ? crypto.randomUUID()
-        : `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    const tempId = crypto.randomUUID()
     const optimistic: Suggestion = {
       id: tempId,
       mascotId: selectedMascotId,
