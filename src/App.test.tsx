@@ -224,7 +224,7 @@ describe('leaderboard', () => {
     )
     expect(before).toEqual(['Beta', 'Alpha'])
 
-    // Vote for Alpha twice so it overtakes Beta (which has 1 vote)
+    // Vote for Alpha once — it ties Beta at 1 vote; older creation date breaks the tie so Alpha ranks first
     await userEvent.click(screen.getAllByRole('button', { name: /vote for alpha/i })[0])
 
     const after = Array.from(leaderboard.querySelectorAll('.leaderboard-entry__name')).map(
