@@ -249,6 +249,62 @@ describe('duplicate suggestions', () => {
   })
 })
 
+describe('input validation', () => {
+  async function typeInSuggestion(name: string) {
+    const input = screen.getByRole('textbox', { name: /name suggestion/i })
+    await userEvent.clear(input)
+    await userEvent.type(input, name)
+  }
+
+  async function submitSuggestion(name: string) {
+    await typeInSuggestion(name)
+    await userEvent.click(screen.getByRole('button', { name: /add suggestion/i }))
+  }
+
+  function getSuggestionNames() {
+    return Array.from(document.querySelectorAll('.suggestion-card__name')).map(
+      (el) => el.textContent,
+    )
+  }
+
+  it('accepts letters, numbers, spaces, apostrophes and hyphens', async () => {
+    render(<App />)
+    await submitSuggestion("Sunny O'Stride-2")
+    expect(getSuggestionNames()).toContain("Sunny O'Stride-2")
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('shows an error and does not submit when emoji is entered', async () => {
+    render(<App />)
+    await submitSuggestion('Sunny 😊')
+    expect(screen.getByRole('alert')).toBeInTheDocument()
+    expect(getSuggestionNames()).toHaveLength(0)
+  })
+
+  it('shows an error and does not submit when unsupported symbol is entered', async () => {
+    render(<App />)
+    await submitSuggestion('Name@Invalid')
+    expect(screen.getByRole('alert')).toBeInTheDocument()
+    expect(getSuggestionNames()).toHaveLength(0)
+  })
+
+  it('shows a validation error while typing invalid characters', async () => {
+    render(<App />)
+    await typeInSuggestion('Bad!')
+    expect(screen.getByRole('alert')).toBeInTheDocument()
+  })
+
+  it('clears the error when input becomes valid', async () => {
+    render(<App />)
+    const input = screen.getByRole('textbox', { name: /name suggestion/i })
+    await userEvent.type(input, 'Bad!')
+    expect(screen.getByRole('alert')).toBeInTheDocument()
+    await userEvent.clear(input)
+    await userEvent.type(input, 'Good')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+})
+
 describe('leaderboard', () => {
   it('renders suggestions sorted by vote count descending', () => {
     const suggestions: Suggestion[] = [
