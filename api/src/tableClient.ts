@@ -1,0 +1,54 @@
+import { TableClient, AzureNamedKeyCredential, TableEntityResult } from '@azure/data-tables'
+
+function getTableClient(tableName: string): TableClient {
+  const connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING
+  if (connectionString) {
+    return TableClient.fromConnectionString(connectionString, tableName)
+  }
+
+  const accountName = process.env.AZURE_STORAGE_ACCOUNT_NAME
+  const accountKey = process.env.AZURE_STORAGE_ACCOUNT_KEY
+  if (accountName && accountKey) {
+    const credential = new AzureNamedKeyCredential(accountName, accountKey)
+    return new TableClient(
+      `https://${accountName}.table.core.windows.net`,
+      tableName,
+      credential,
+    )
+  }
+
+  throw new Error(
+    'Azure Storage credentials not configured. Set AZURE_STORAGE_CONNECTION_STRING or both AZURE_STORAGE_ACCOUNT_NAME and AZURE_STORAGE_ACCOUNT_KEY.',
+  )
+}
+
+export interface SuggestionEntity {
+  partitionKey: string
+  rowKey: string
+  name: string
+  createdAt: string
+  votes: number
+}
+
+export interface VoteEntity {
+  partitionKey: string
+  rowKey: string
+}
+
+export function getSuggestionsClient(): TableClient {
+  return getTableClient('suggestions')
+}
+
+export function getVotesClient(): TableClient {
+  return getTableClient('votes')
+}
+
+export function entityToSuggestion(entity: TableEntityResult<SuggestionEntity>) {
+  return {
+    id: entity.rowKey,
+    mascotId: entity.partitionKey,
+    name: entity.name,
+    createdAt: entity.createdAt,
+    votes: entity.votes ?? 0,
+  }
+}

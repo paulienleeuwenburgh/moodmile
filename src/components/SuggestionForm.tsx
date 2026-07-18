@@ -7,7 +7,7 @@ interface SuggestionFormProps {
   mascots: Mascot[]
   selectedMascotId: string
   onMascotChange: (mascotId: string) => void
-  onSubmitSuggestion: (suggestionText: string) => void
+  onSubmitSuggestion: (suggestionText: string) => void | Promise<void>
 }
 
 export function SuggestionForm({
