@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import type { Mascot } from '../types'
+import { validateSuggestion } from '../utils/validateSuggestion'
 
 interface SuggestionFormProps {
   mascots: Mascot[]
@@ -16,6 +17,12 @@ export function SuggestionForm({
   onSubmitSuggestion,
 }: SuggestionFormProps) {
   const [suggestion, setSuggestion] = useState('')
+  const [validationError, setValidationError] = useState('')
+
+  const handleChange = (value: string) => {
+    setSuggestion(value)
+    setValidationError(validateSuggestion(value))
+  }
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -24,8 +31,15 @@ export function SuggestionForm({
       return
     }
 
+    const error = validateSuggestion(trimmedSuggestion)
+    if (error) {
+      setValidationError(error)
+      return
+    }
+
     onSubmitSuggestion(trimmedSuggestion)
     setSuggestion('')
+    setValidationError('')
   }
 
   return (
@@ -50,10 +64,17 @@ export function SuggestionForm({
         <input
           id="name-suggestion"
           value={suggestion}
-          onChange={(event) => setSuggestion(event.target.value)}
+          onChange={(event) => handleChange(event.target.value)}
           placeholder="e.g. Sunny Stride"
           maxLength={60}
+          aria-describedby={validationError ? 'name-suggestion-error' : undefined}
+          aria-invalid={!!validationError}
         />
+        {validationError && (
+          <span id="name-suggestion-error" className="suggestion-form__error" role="alert">
+            {validationError}
+          </span>
+        )}
       </div>
       <button type="submit">Add suggestion</button>
     </form>
