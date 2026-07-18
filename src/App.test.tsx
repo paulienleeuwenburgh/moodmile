@@ -192,6 +192,63 @@ describe('suggestion board ordering', () => {
   })
 })
 
+describe('duplicate suggestions', () => {
+  async function submitSuggestion(name: string) {
+    const input = screen.getByRole('textbox', { name: /name suggestion/i })
+    await userEvent.clear(input)
+    await userEvent.type(input, name)
+    await userEvent.click(screen.getByRole('button', { name: /add suggestion/i }))
+  }
+
+  function getSuggestionNames() {
+    return Array.from(document.querySelectorAll('.suggestion-card__name')).map(
+      (el) => el.textContent,
+    )
+  }
+
+  it('does not add a duplicate suggestion with the same name for the same mascot', async () => {
+    render(<App />)
+    await submitSuggestion('Comet')
+    await submitSuggestion('Comet')
+    expect(getSuggestionNames().filter((n) => n === 'Comet')).toHaveLength(1)
+  })
+
+  it('does not add a duplicate when name differs only by case', async () => {
+    render(<App />)
+    await submitSuggestion('Comet')
+    await submitSuggestion('comet')
+    expect(getSuggestionNames()).toHaveLength(1)
+  })
+
+  it('does not add a duplicate when name differs only by surrounding whitespace', async () => {
+    render(<App />)
+    await submitSuggestion('Comet')
+    // The form trims before calling onSubmitSuggestion, so submitting '  Comet  ' is equivalent
+    await submitSuggestion('  Comet  ')
+    expect(getSuggestionNames()).toHaveLength(1)
+  })
+
+  it('allows the same name for different mascots', async () => {
+    render(<App />)
+
+    // Select first mascot and submit
+    const select = screen.getByRole('combobox', { name: /mascot/i })
+    const options = Array.from(select.querySelectorAll('option'))
+    if (options.length < 2) {
+      // Skip if there are not at least 2 mascots
+      return
+    }
+
+    await userEvent.selectOptions(select, options[0].value)
+    await submitSuggestion('Star')
+
+    await userEvent.selectOptions(select, options[1].value)
+    await submitSuggestion('Star')
+
+    expect(getSuggestionNames().filter((n) => n === 'Star')).toHaveLength(2)
+  })
+})
+
 describe('leaderboard', () => {
   it('renders suggestions sorted by vote count descending', () => {
     const suggestions: Suggestion[] = [
