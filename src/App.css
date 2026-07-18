@@ -1,10 +1,15 @@
 /* ── Design tokens ───────────────────────────────────────────────────────── */
 :root {
   --color-primary: #7b3ef7;
+  --color-primary-rgb: 123, 62, 247;
   --color-primary-dark: #5e23d6;
   --color-secondary: #e8195c;
+  --color-secondary-dark: #c4147d;
   --color-accent: #00b2ff;
+  --color-accent-rgb: 0, 178, 255;
   --color-ninja-dark: #120c2e;
+  --color-ninja-gradient-mid: #2d1060;
+  --color-ninja-gradient-end: #1a1050;
   --color-ninja-mid: #241a42;
   --color-bg: #f2f1fa;
   --color-surface: #ffffff;
@@ -12,6 +17,9 @@
   --color-text-muted: #4a3f6b;
   --color-border: #dcd6f4;
   --color-tag-bg: #f0ecff;
+  --color-card-selected-bg: #e0d3ff;
+  --color-card-selected-end: #c5edff;
+  --color-gold-highlight: #fffbe6;
   --shadow-card: 0 4px 20px rgba(30, 18, 70, 0.10);
   --shadow-card-hover: 0 10px 32px rgba(30, 18, 70, 0.18);
   --shadow-selected: 0 8px 28px rgba(123, 62, 247, 0.28);
@@ -32,7 +40,7 @@
 /* ── Hero ─────────────────────────────────────────────────────────────────── */
 .hero {
   position: relative;
-  background: linear-gradient(130deg, var(--color-ninja-dark) 0%, #2d1060 55%, #1a1050 100%);
+  background: linear-gradient(130deg, var(--color-ninja-dark) 0%, var(--color-ninja-gradient-mid) 55%, var(--color-ninja-gradient-end) 100%);
   border-radius: var(--radius-card);
   padding: 2.5rem 2.5rem 2.25rem;
   overflow: hidden;
@@ -45,8 +53,8 @@
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse 60% 80% at 90% -10%, rgba(0, 178, 255, 0.18) 0%, transparent 70%),
-    radial-gradient(ellipse 50% 60% at -10% 110%, rgba(123, 62, 247, 0.30) 0%, transparent 65%);
+    radial-gradient(ellipse 60% 80% at 90% -10%, rgba(var(--color-accent-rgb), 0.18) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 60% at -10% 110%, rgba(var(--color-primary-rgb), 0.30) 0%, transparent 65%);
   pointer-events: none;
 }
 
@@ -153,7 +161,7 @@
 }
 
 .mascot-card--selected .mascot-card__image-wrap {
-  background: linear-gradient(160deg, #e0d3ff 0%, #c5edff 100%);
+  background: linear-gradient(160deg, var(--color-card-selected-bg) 0%, var(--color-card-selected-end) 100%);
 }
 
 /* ── Suggestion form ─────────────────────────────────────────────────────── */
@@ -354,7 +362,7 @@
 }
 
 .vote-btn--voted:hover {
-  background: linear-gradient(135deg, var(--color-primary-dark), #c4147d);
+  background: linear-gradient(135deg, var(--color-primary-dark), var(--color-secondary-dark));
   color: #fff;
   transform: translateY(-1px);
 }
@@ -409,7 +417,7 @@
 }
 
 .leaderboard-entry:nth-child(1) {
-  background: linear-gradient(90deg, #fffbe6 0%, var(--color-surface) 60%);
+  background: linear-gradient(90deg, var(--color-gold-highlight) 0%, var(--color-surface) 60%);
   border-left: 3px solid #f5c400;
 }
 
