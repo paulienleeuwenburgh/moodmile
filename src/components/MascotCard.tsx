@@ -14,9 +14,13 @@ export function MascotCard({ mascot, isSelected, onSelect }: MascotCardProps) {
       onClick={() => onSelect(mascot.id)}
       aria-pressed={isSelected}
     >
-      <img src={mascot.image} alt={mascot.title} className="mascot-card__image" />
-      <h3>{mascot.title}</h3>
-      <p>{mascot.description}</p>
+      <div className="mascot-card__image-wrap">
+        <img src={mascot.image} alt={mascot.title} className="mascot-card__image" />
+      </div>
+      <div className="mascot-card__body">
+        <h3>{mascot.title}</h3>
+        <p>{mascot.description}</p>
+      </div>
     </button>
   )
 }

@@ -3,26 +3,26 @@ import type { Mascot } from '../types'
 export const mascots: Mascot[] = [
   {
     id: 'comet',
-    title: 'Comet Crew',
-    description: 'A fast and fearless spark that represents momentum and teamwork.',
-    image: '/mascots/comet.svg',
+    title: 'Comet',
+    description: 'Lightning-fast and fearless — this ninja strikes before you even see them coming.',
+    image: '/mascots/ninja1.png',
   },
   {
     id: 'splash',
-    title: 'Splash Squad',
-    description: 'A joyful wave of ideas that keeps everyone energized and connected.',
-    image: '/mascots/splash.svg',
+    title: 'Splash',
+    description: 'Fluid and adaptable — this ninja flows through any obstacle with effortless grace.',
+    image: '/mascots/ninja2.png',
   },
   {
     id: 'sprout',
-    title: 'Sprout Circle',
-    description: 'A curious growth buddy focused on learning and positive progress.',
-    image: '/mascots/sprout.svg',
+    title: 'Sprout',
+    description: 'Curious and tenacious — this ninja grows stronger with every new challenge.',
+    image: '/mascots/ninja3.png',
   },
   {
     id: 'spark',
-    title: 'Spark Alliance',
-    description: 'A bright, confident mascot that celebrates creativity every day.',
-    image: '/mascots/spark.svg',
+    title: 'Spark',
+    description: 'Bold and electrifying — this ninja ignites creativity and lights up the room.',
+    image: '/mascots/ninja4.png',
   },
 ]
