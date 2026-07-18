@@ -6,67 +6,85 @@ import { SuggestionBoard } from './components/SuggestionBoard'
 import { SuggestionForm } from './components/SuggestionForm'
 import { mascots } from './data/mascots'
 import type { Suggestion } from './types'
-import { loadSuggestions, saveSuggestions } from './utils/suggestionsStorage'
-import { loadVotedIds, saveVotedIds } from './utils/votesStorage'
-
-const getSuggestionId = () =>
-  typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-    ? crypto.randomUUID()
-    : `suggestion-${Date.now()}-${Math.random().toString(36).slice(2)}`
+import { fetchSuggestions, fetchVotedIds, postSuggestion, postVote } from './api'
+import { getSessionId } from './utils/sessionId'
 
 function App() {
   const [selectedMascotId, setSelectedMascotId] = useState(mascots[0]?.id ?? '')
-  const [suggestions, setSuggestions] = useState<Suggestion[]>(() => loadSuggestions())
-  const [votedIds, setVotedIds] = useState<Set<string>>(() => loadVotedIds())
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([])
+  const [votedIds, setVotedIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
-    saveSuggestions(suggestions)
-  }, [suggestions])
-
-  useEffect(() => {
-    saveVotedIds(votedIds)
-  }, [votedIds])
+    const sessionId = getSessionId()
+    Promise.all([fetchSuggestions(), fetchVotedIds(sessionId)]).then(
+      ([loadedSuggestions, loadedVotedIds]) => {
+        setSuggestions(loadedSuggestions)
+        setVotedIds(loadedVotedIds)
+      },
+    )
+  }, [])
 
   const handleSuggestionSubmit = (name: string) => {
     if (!selectedMascotId) {
       return
     }
 
-    setSuggestions((currentSuggestions) => {
-      const isDuplicate = currentSuggestions.some(
-        (s) =>
-          s.mascotId === selectedMascotId &&
-          s.name.trim().toLowerCase() === name.trim().toLowerCase(),
-      )
-      if (isDuplicate) {
-        return currentSuggestions
-      }
-      return [
-        ...currentSuggestions,
-        {
-          id: getSuggestionId(),
-          mascotId: selectedMascotId,
-          name: name.trim(),
-          createdAt: new Date().toISOString(),
-          votes: 0,
-        },
-      ]
-    })
+    // Client-side duplicate guard (UX): normalise and skip if already present
+    const isDuplicate = suggestions.some(
+      (s) =>
+        s.mascotId === selectedMascotId &&
+        s.name.trim().toLowerCase() === name.trim().toLowerCase(),
+    )
+    if (isDuplicate) {
+      return
+    }
+
+    // Optimistic: add immediately so the UI responds without waiting for the API round trip.
+    const tempId =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    const optimistic: Suggestion = {
+      id: tempId,
+      mascotId: selectedMascotId,
+      name: name.trim(),
+      createdAt: new Date().toISOString(),
+      votes: 0,
+    }
+    setSuggestions((current) => [...current, optimistic])
+
+    // Persist to backend and swap the temp entry for the server-assigned one
+    postSuggestion(selectedMascotId, name.trim())
+      .then((created) => {
+        if (created) {
+          setSuggestions((current) =>
+            current.map((s) => (s.id === tempId ? created : s)),
+          )
+        } else {
+          // Backend rejected (e.g. race-condition duplicate) — remove optimistic entry
+          setSuggestions((current) => current.filter((s) => s.id !== tempId))
+        }
+      })
+      .catch(() => {
+        setSuggestions((current) => current.filter((s) => s.id !== tempId))
+      })
   }
 
-  const handleVote = (suggestionId: string) => {
+  const handleVote = async (suggestionId: string) => {
     const hasVoted = votedIds.has(suggestionId)
+    const sessionId = getSessionId()
 
-    setSuggestions((currentSuggestions) =>
-      currentSuggestions.map((s) =>
-        s.id === suggestionId
-          ? { ...s, votes: hasVoted ? s.votes - 1 : s.votes + 1 }
-          : s,
-      ),
+    const updated = await postVote(suggestionId, sessionId, hasVoted)
+
+    setSuggestions((current) =>
+      current.map((s) => {
+        if (s.id !== suggestionId) return s
+        return updated ?? { ...s, votes: hasVoted ? s.votes - 1 : s.votes + 1 }
+      }),
     )
 
-    setVotedIds((currentVotedIds) => {
-      const next = new Set(currentVotedIds)
+    setVotedIds((current) => {
+      const next = new Set(current)
       if (hasVoted) {
         next.delete(suggestionId)
       } else {
@@ -83,7 +101,7 @@ function App() {
         <h1>Help us name our next mascot</h1>
         <p>
           Pick your favorite mascot and drop as many name ideas as you want. Every
-          suggestion is saved in your browser.
+          suggestion is saved for everyone to see.
         </p>
       </section>
 

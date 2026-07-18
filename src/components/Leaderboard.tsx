@@ -4,7 +4,7 @@ interface LeaderboardProps {
   mascots: Mascot[]
   suggestions: Suggestion[]
   votedIds: Set<string>
-  onVote: (suggestionId: string) => void
+  onVote: (suggestionId: string) => void | Promise<void>
 }
 
 export function Leaderboard({ mascots, suggestions, votedIds, onVote }: LeaderboardProps) {

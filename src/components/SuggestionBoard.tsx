@@ -4,7 +4,7 @@ interface SuggestionBoardProps {
   mascots: Mascot[]
   suggestions: Suggestion[]
   votedIds: Set<string>
-  onVote: (suggestionId: string) => void
+  onVote: (suggestionId: string) => void | Promise<void>
 }
 
 export function SuggestionBoard({ mascots, suggestions, votedIds, onVote }: SuggestionBoardProps) {

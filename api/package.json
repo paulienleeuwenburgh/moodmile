@@ -1,0 +1,19 @@
+{
+  "name": "moodmile-api",
+  "version": "1.0.0",
+  "description": "Azure Functions backend for MoodMile",
+  "main": "dist/src/index.js",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "prestart": "npm run build",
+    "start": "func start"
+  },
+  "dependencies": {
+    "@azure/data-tables": "^13.3.2",
+    "@azure/functions": "^4.16.2"
+  },
+  "devDependencies": {
+    "typescript": "~5.7.2"
+  }
+}

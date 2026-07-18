@@ -1,11 +1,30 @@
 import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import type { Suggestion } from './types'
 
-const SUGGESTIONS_KEY = 'moodmile-suggestions-v1'
-const VOTES_KEY = 'moodmile-votes-v1'
+// ---------------------------------------------------------------------------
+// Mock the API module so tests never make real HTTP calls
+// ---------------------------------------------------------------------------
+const mockFetchSuggestions = vi.fn<() => Promise<Suggestion[]>>()
+const mockFetchVotedIds = vi.fn<() => Promise<Set<string>>>()
+const mockPostSuggestion = vi.fn<(mascotId: string, name: string) => Promise<Suggestion | null>>()
+const mockPostVote = vi.fn<
+  (suggestionId: string, sessionId: string, revoke: boolean) => Promise<Suggestion | null>
+>()
+
+vi.mock('./api', () => ({
+  fetchSuggestions: (...args: Parameters<typeof mockFetchSuggestions>) =>
+    mockFetchSuggestions(...args),
+  fetchVotedIds: (...args: Parameters<typeof mockFetchVotedIds>) => mockFetchVotedIds(...args),
+  postSuggestion: (...args: Parameters<typeof mockPostSuggestion>) => mockPostSuggestion(...args),
+  postVote: (...args: Parameters<typeof mockPostVote>) => mockPostVote(...args),
+}))
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 const testSuggestion: Suggestion = {
   id: 'test-suggestion-1',
@@ -15,12 +34,34 @@ const testSuggestion: Suggestion = {
   votes: 0,
 }
 
-function seedSuggestion(suggestion: Suggestion = testSuggestion) {
-  localStorage.setItem(SUGGESTIONS_KEY, JSON.stringify([suggestion]))
-}
-
-function seedVotedIds(ids: string[]) {
-  localStorage.setItem(VOTES_KEY, JSON.stringify(ids))
+function setupApi(
+  suggestions: Suggestion[] = [],
+  votedIds: string[] = [],
+) {
+  mockFetchSuggestions.mockResolvedValue(suggestions)
+  mockFetchVotedIds.mockResolvedValue(new Set(votedIds))
+  mockPostSuggestion.mockImplementation(async (mascotId, name) => {
+    const isDuplicate = suggestions.some(
+      (s) => s.mascotId === mascotId && s.name.trim().toLowerCase() === name.trim().toLowerCase(),
+    )
+    if (isDuplicate) return null
+    const created: Suggestion = {
+      id: `new-${suggestions.length + 1}`,
+      mascotId,
+      name,
+      createdAt: new Date().toISOString(),
+      votes: 0,
+    }
+    suggestions.push(created)
+    return created
+  })
+  mockPostVote.mockImplementation(async (suggestionId, _sessionId, revoke) => {
+    const idx = suggestions.findIndex((s) => s.id === suggestionId)
+    if (idx === -1) return null
+    const updated = { ...suggestions[idx], votes: revoke ? suggestions[idx].votes - 1 : suggestions[idx].votes + 1 }
+    suggestions[idx] = updated
+    return updated
+  })
 }
 
 function getVoteButton() {
@@ -31,7 +72,14 @@ function getVoteCount(): number {
   return parseInt(document.querySelector('.vote-btn__count')!.textContent ?? '0', 10)
 }
 
+const threeSuggestions: Suggestion[] = [
+  { id: 'hanzo', mascotId: 'comet', name: 'Hanzo', createdAt: '2024-01-01T00:00:00.000Z', votes: 0 },
+  { id: 'yuki', mascotId: 'comet', name: 'Yuki', createdAt: '2024-01-02T00:00:00.000Z', votes: 0 },
+  { id: 'kimi', mascotId: 'comet', name: 'Kimi', createdAt: '2024-01-03T00:00:00.000Z', votes: 0 },
+]
+
 beforeEach(() => {
+  vi.clearAllMocks()
   localStorage.clear()
 })
 
@@ -39,20 +87,15 @@ afterEach(() => {
   cleanup()
 })
 
-const threeSuggestions: Suggestion[] = [
-  { id: 'hanzo', mascotId: 'comet', name: 'Hanzo', createdAt: '2024-01-01T00:00:00.000Z', votes: 0 },
-  { id: 'yuki', mascotId: 'comet', name: 'Yuki', createdAt: '2024-01-02T00:00:00.000Z', votes: 0 },
-  { id: 'kimi', mascotId: 'comet', name: 'Kimi', createdAt: '2024-01-03T00:00:00.000Z', votes: 0 },
-]
-
-function seedSuggestions(suggestions: Suggestion[]) {
-  localStorage.setItem(SUGGESTIONS_KEY, JSON.stringify(suggestions))
-}
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
 
 describe('vote targeting', () => {
   it('voting Hanzo only changes Hanzo', async () => {
-    seedSuggestions(threeSuggestions)
+    setupApi([...threeSuggestions])
     render(<App />)
+    await screen.findAllByRole('button', { name: /vote for hanzo/i })
 
     await userEvent.click(screen.getAllByRole('button', { name: /vote for hanzo/i })[0])
 
@@ -62,8 +105,9 @@ describe('vote targeting', () => {
   })
 
   it('voting Kimi only changes Kimi', async () => {
-    seedSuggestions(threeSuggestions)
+    setupApi([...threeSuggestions])
     render(<App />)
+    await screen.findAllByRole('button', { name: /vote for kimi/i })
 
     await userEvent.click(screen.getAllByRole('button', { name: /vote for kimi/i })[0])
 
@@ -73,20 +117,17 @@ describe('vote targeting', () => {
   })
 
   it('sorting and re-rendering do not affect vote targeting', async () => {
-    // Yuki has 5 votes so it appears first in the leaderboard; Hanzo and Kimi have 0
-    // The suggestion board is ordered by creation date so Hanzo still appears first
     const sorted: Suggestion[] = [
       { ...threeSuggestions[0], votes: 0 },
       { ...threeSuggestions[1], votes: 5 },
       { ...threeSuggestions[2], votes: 0 },
     ]
-    seedSuggestions(sorted)
+    setupApi([...sorted])
     render(<App />)
+    await screen.findAllByRole('button', { name: /vote for hanzo/i })
 
-    // Vote for Hanzo — it is the oldest suggestion (creation-date order)
     await userEvent.click(screen.getAllByRole('button', { name: /vote for hanzo/i })[0])
 
-    // Only Hanzo should be toggled to voted state; Yuki and Kimi remain unvoted
     expect(screen.getAllByRole('button', { name: /remove vote for hanzo/i })[0]).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /remove vote for yuki/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /remove vote for kimi/i })).not.toBeInTheDocument()
@@ -95,70 +136,64 @@ describe('vote targeting', () => {
 
 describe('voting', () => {
   it('increments vote count from 0 to 1 on first click', async () => {
-    seedSuggestion()
+    setupApi([{ ...testSuggestion }])
     render(<App />)
+    await screen.findAllByRole('button', { name: /vote for rocket/i })
 
     expect(getVoteCount()).toBe(0)
-
     await userEvent.click(getVoteButton())
-
     expect(getVoteCount()).toBe(1)
   })
 
   it('decrements vote count from 1 to 0 when revoking a vote', async () => {
-    seedSuggestion({ ...testSuggestion, votes: 1 })
-    seedVotedIds([testSuggestion.id])
+    setupApi([{ ...testSuggestion, votes: 1 }], [testSuggestion.id])
     render(<App />)
+    await screen.findAllByRole('button', { name: /remove vote for rocket/i })
 
     expect(getVoteCount()).toBe(1)
-
-    const revokeButton = screen.getAllByRole('button', { name: /remove vote for rocket/i })[0]
-    await userEvent.click(revokeButton)
-
+    await userEvent.click(screen.getAllByRole('button', { name: /remove vote for rocket/i })[0])
     expect(getVoteCount()).toBe(0)
   })
 
   it('prevents a second vote from the same browser session', async () => {
-    seedSuggestion()
+    setupApi([{ ...testSuggestion }])
     render(<App />)
+    await screen.findAllByRole('button', { name: /vote for rocket/i })
 
     await userEvent.click(getVoteButton())
     expect(getVoteCount()).toBe(1)
 
-    // The button is now in "voted" state — clicking again revokes, not double-votes
     const revokeButton = screen.getAllByRole('button', { name: /remove vote for rocket/i })[0]
     await userEvent.click(revokeButton)
     expect(getVoteCount()).toBe(0)
 
-    // Vote again — still only 1, not 2
     await userEvent.click(getVoteButton())
     expect(getVoteCount()).toBe(1)
   })
 
-  it('marks the vote button as already voted when localStorage has the suggestion id', async () => {
-    seedSuggestion({ ...testSuggestion, votes: 1 })
-    seedVotedIds([testSuggestion.id])
+  it('marks the vote button as already voted when the backend reports a prior vote', async () => {
+    setupApi([{ ...testSuggestion, votes: 1 }], [testSuggestion.id])
     render(<App />)
+    await screen.findAllByRole('button', { name: /remove vote for rocket/i })
 
-    // The button shows "remove vote" aria-label, meaning duplicate vote is blocked
     expect(screen.getAllByRole('button', { name: /remove vote for rocket/i })[0]).toBeInTheDocument()
     expect(getVoteCount()).toBe(1)
 
-    // Clicking once removes the vote rather than adding another
     await userEvent.click(screen.getAllByRole('button', { name: /remove vote for rocket/i })[0])
     expect(getVoteCount()).toBe(0)
   })
 })
 
 describe('suggestion board ordering', () => {
-  it('renders suggestions in creation-date order regardless of vote counts', () => {
+  it('renders suggestions in creation-date order regardless of vote counts', async () => {
     const suggestions: Suggestion[] = [
       { id: 'a', mascotId: 'comet', name: 'Alpha', createdAt: '2024-01-01T00:00:00.000Z', votes: 10 },
       { id: 'b', mascotId: 'comet', name: 'Beta', createdAt: '2024-01-02T00:00:00.000Z', votes: 0 },
       { id: 'c', mascotId: 'comet', name: 'Gamma', createdAt: '2024-01-03T00:00:00.000Z', votes: 5 },
     ]
-    seedSuggestions(suggestions)
+    setupApi(suggestions)
     render(<App />)
+    await screen.findAllByText('Alpha')
 
     const boardSection = document.querySelector('.suggestion-board')!
     const names = Array.from(boardSection.querySelectorAll('.suggestion-card__name')).map(
@@ -172,17 +207,16 @@ describe('suggestion board ordering', () => {
       { id: 'a', mascotId: 'comet', name: 'Alpha', createdAt: '2024-01-01T00:00:00.000Z', votes: 0 },
       { id: 'b', mascotId: 'comet', name: 'Beta', createdAt: '2024-01-02T00:00:00.000Z', votes: 0 },
     ]
-    seedSuggestions(suggestions)
+    setupApi(suggestions)
     render(<App />)
+    await screen.findAllByText('Alpha')
 
     const boardSection = document.querySelector('.suggestion-board')!
-
     const before = Array.from(boardSection.querySelectorAll('.suggestion-card__name')).map(
       (el) => el.textContent,
     )
     expect(before).toEqual(['Alpha', 'Beta'])
 
-    // Vote for Beta (the second card)
     await userEvent.click(screen.getAllByRole('button', { name: /vote for beta/i })[0])
 
     const after = Array.from(boardSection.querySelectorAll('.suggestion-card__name')).map(
@@ -207,6 +241,7 @@ describe('duplicate suggestions', () => {
   }
 
   it('does not add a duplicate suggestion with the same name for the same mascot', async () => {
+    setupApi()
     render(<App />)
     await submitSuggestion('Comet')
     await submitSuggestion('Comet')
@@ -214,6 +249,7 @@ describe('duplicate suggestions', () => {
   })
 
   it('does not add a duplicate when name differs only by case', async () => {
+    setupApi()
     render(<App />)
     await submitSuggestion('Comet')
     await submitSuggestion('comet')
@@ -221,21 +257,20 @@ describe('duplicate suggestions', () => {
   })
 
   it('does not add a duplicate when name differs only by surrounding whitespace', async () => {
+    setupApi()
     render(<App />)
     await submitSuggestion('Comet')
-    // The form trims before calling onSubmitSuggestion, so submitting '  Comet  ' is equivalent
     await submitSuggestion('  Comet  ')
     expect(getSuggestionNames()).toHaveLength(1)
   })
 
   it('allows the same name for different mascots', async () => {
+    setupApi()
     render(<App />)
 
-    // Select first mascot and submit
     const select = screen.getByRole('combobox', { name: /mascot/i })
     const options = Array.from(select.querySelectorAll('option'))
     if (options.length < 2) {
-      // Skip if there are not at least 2 mascots
       return
     }
 
@@ -268,6 +303,7 @@ describe('input validation', () => {
   }
 
   it('accepts letters, numbers, spaces, apostrophes and hyphens', async () => {
+    setupApi()
     render(<App />)
     await submitSuggestion("Sunny O'Stride-2")
     expect(getSuggestionNames()).toContain("Sunny O'Stride-2")
@@ -275,6 +311,7 @@ describe('input validation', () => {
   })
 
   it('shows an error and does not submit when emoji is entered', async () => {
+    setupApi()
     render(<App />)
     await submitSuggestion('Sunny 😊')
     expect(screen.getByRole('alert')).toBeInTheDocument()
@@ -282,6 +319,7 @@ describe('input validation', () => {
   })
 
   it('shows an error and does not submit when unsupported symbol is entered', async () => {
+    setupApi()
     render(<App />)
     await submitSuggestion('Name@Invalid')
     expect(screen.getByRole('alert')).toBeInTheDocument()
@@ -289,12 +327,14 @@ describe('input validation', () => {
   })
 
   it('shows a validation error while typing invalid characters', async () => {
+    setupApi()
     render(<App />)
     await typeInSuggestion('Bad!')
     expect(screen.getByRole('alert')).toBeInTheDocument()
   })
 
   it('clears the error when input becomes valid', async () => {
+    setupApi()
     render(<App />)
     const input = screen.getByRole('textbox', { name: /name suggestion/i })
     await userEvent.type(input, 'Bad!')
@@ -306,14 +346,15 @@ describe('input validation', () => {
 })
 
 describe('leaderboard', () => {
-  it('renders suggestions sorted by vote count descending', () => {
+  it('renders suggestions sorted by vote count descending', async () => {
     const suggestions: Suggestion[] = [
       { id: 'a', mascotId: 'comet', name: 'Alpha', createdAt: '2024-01-01T00:00:00.000Z', votes: 2 },
       { id: 'b', mascotId: 'comet', name: 'Beta', createdAt: '2024-01-02T00:00:00.000Z', votes: 5 },
       { id: 'c', mascotId: 'comet', name: 'Gamma', createdAt: '2024-01-03T00:00:00.000Z', votes: 1 },
     ]
-    seedSuggestions(suggestions)
+    setupApi(suggestions)
     render(<App />)
+    await screen.findAllByText('Beta')
 
     const leaderboard = document.querySelector('.leaderboard')!
     const names = Array.from(leaderboard.querySelectorAll('.leaderboard-entry__name')).map(
@@ -327,17 +368,16 @@ describe('leaderboard', () => {
       { id: 'a', mascotId: 'comet', name: 'Alpha', createdAt: '2024-01-01T00:00:00.000Z', votes: 0 },
       { id: 'b', mascotId: 'comet', name: 'Beta', createdAt: '2024-01-02T00:00:00.000Z', votes: 1 },
     ]
-    seedSuggestions(suggestions)
+    setupApi(suggestions)
     render(<App />)
+    await screen.findAllByText('Beta')
 
     const leaderboard = document.querySelector('.leaderboard')!
-
     const before = Array.from(leaderboard.querySelectorAll('.leaderboard-entry__name')).map(
       (el) => el.textContent,
     )
     expect(before).toEqual(['Beta', 'Alpha'])
 
-    // Vote for Alpha once — it ties Beta at 1 vote; older creation date breaks the tie so Alpha ranks first
     await userEvent.click(screen.getAllByRole('button', { name: /vote for alpha/i })[0])
 
     const after = Array.from(leaderboard.querySelectorAll('.leaderboard-entry__name')).map(
@@ -346,8 +386,11 @@ describe('leaderboard', () => {
     expect(after).toEqual(['Alpha', 'Beta'])
   })
 
-  it('is not rendered when there are no suggestions', () => {
+  it('is not rendered when there are no suggestions', async () => {
+    setupApi()
     render(<App />)
+    // Wait for loading to finish then assert
+    await screen.findByRole('button', { name: /add suggestion/i })
     expect(document.querySelector('.leaderboard')).not.toBeInTheDocument()
   })
 })
