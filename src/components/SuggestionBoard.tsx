@@ -15,7 +15,7 @@ export function SuggestionBoard({ mascots, suggestions, votedIds, onVote }: Sugg
         {mascots.map((mascot) => {
           const mascotSuggestions = suggestions
             .filter((suggestion) => suggestion.mascotId === mascot.id)
-            .sort((a, b) => b.votes - a.votes || b.createdAt.localeCompare(a.createdAt))
+            .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
 
           return (
             <article key={mascot.id} className="suggestion-group">

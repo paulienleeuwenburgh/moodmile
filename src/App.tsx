@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import './App.css'
+import { Leaderboard } from './components/Leaderboard'
 import { MascotCard } from './components/MascotCard'
 import { SuggestionBoard } from './components/SuggestionBoard'
 import { SuggestionForm } from './components/SuggestionForm'
@@ -95,6 +96,13 @@ function App() {
       />
 
       <SuggestionBoard
+        mascots={mascots}
+        suggestions={suggestions}
+        votedIds={votedIds}
+        onVote={handleVote}
+      />
+
+      <Leaderboard
         mascots={mascots}
         suggestions={suggestions}
         votedIds={votedIds}
