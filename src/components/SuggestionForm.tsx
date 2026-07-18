@@ -68,7 +68,7 @@ export function SuggestionForm({
           placeholder="e.g. Sunny Stride"
           maxLength={60}
           aria-describedby={validationError ? 'name-suggestion-error' : undefined}
-          aria-invalid={validationError ? true : undefined}
+          aria-invalid={!!validationError}
         />
         {validationError && (
           <span id="name-suggestion-error" className="suggestion-form__error" role="alert">
