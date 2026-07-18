@@ -46,7 +46,7 @@ function App() {
         {
           id: getSuggestionId(),
           mascotId: selectedMascotId,
-          name,
+          name: name.trim(),
           createdAt: new Date().toISOString(),
           votes: 0,
         },
