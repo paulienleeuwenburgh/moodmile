@@ -11,6 +11,8 @@ async function getSuggestions(
   const client = getSuggestionsClient()
   const suggestions = []
 
+  // Filter all partition keys that start with "{campaignId}|".
+  // '~' (ASCII 126) is one above '|' (ASCII 124), giving a correct lexicographic upper bound.
   const filter = campaignId
     ? `PartitionKey ge '${escapeODataString(campaignId)}|' and PartitionKey lt '${escapeODataString(campaignId)}~'`
     : undefined

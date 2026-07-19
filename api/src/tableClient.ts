@@ -64,10 +64,14 @@ export function getVotesClient(): TableClient {
 }
 
 export function entityToSuggestion(entity: TableEntityResult<SuggestionEntity>) {
+  // partitionKey is always in the format "{campaignId}|{questionId}" for entities
+  // created by this application. The campaignId and questionId properties are stored
+  // explicitly on the entity, with the split used only as a fallback for older rows.
+  const [fallbackCampaignId, fallbackQuestionId] = entity.partitionKey.split('|')
   return {
     id: entity.rowKey,
-    campaignId: entity.campaignId ?? entity.partitionKey.split('|')[0],
-    questionId: entity.questionId ?? entity.partitionKey.split('|')[1],
+    campaignId: entity.campaignId ?? fallbackCampaignId ?? '',
+    questionId: entity.questionId ?? fallbackQuestionId ?? '',
     name: entity.name,
     createdAt: entity.createdAt,
     votes: entity.votes ?? 0,
