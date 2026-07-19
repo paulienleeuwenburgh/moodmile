@@ -10,16 +10,16 @@ export function QuestionCard({ question, isSelected, onSelect }: QuestionCardPro
   return (
     <button
       type="button"
-      className={`mascot-card${isSelected ? ' mascot-card--selected' : ''}`}
+      className={`question-card${isSelected ? ' question-card--selected' : ''}`}
       onClick={() => onSelect(question.id)}
       aria-pressed={isSelected}
     >
-      <div className="mascot-card__image-wrap">
+      <div className="question-card__image-wrap">
         {question.imageUrl && (
-          <img src={question.imageUrl} alt={question.title} className="mascot-card__image" />
+          <img src={question.imageUrl} alt={question.title} className="question-card__image" />
         )}
       </div>
-      <div className="mascot-card__body">
+      <div className="question-card__body">
         <h3>{question.title}</h3>
         <p>{question.description}</p>
       </div>

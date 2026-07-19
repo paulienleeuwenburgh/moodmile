@@ -12,7 +12,7 @@ async function getSuggestions(
   const suggestions = []
 
   const filter = campaignId
-    ? `PartitionKey ge '${escapeODataString(campaignId)}|' and PartitionKey lt '${escapeODataString(campaignId)}}'`
+    ? `PartitionKey ge '${escapeODataString(campaignId)}|' and PartitionKey lt '${escapeODataString(campaignId)}~'`
     : undefined
 
   for await (const entity of client.listEntities<SuggestionEntity>({
