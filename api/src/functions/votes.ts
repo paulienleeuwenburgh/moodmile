@@ -1,21 +1,33 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions'
 import { RestError, type TableEntityResult } from '@azure/data-tables'
-import { entityToSuggestion, getSuggestionsClient, getVotesClient, SuggestionEntity } from '../tableClient'
+import {
+  entityToSuggestion,
+  getSuggestionsClient,
+  getVotesClient,
+  SuggestionEntity,
+  VoteEntity,
+  suggestionPartitionKey,
+  votePartitionKey,
+} from '../tableClient'
 import { escapeODataString } from '../odata'
+import { getCampaign } from '../campaigns'
 
 async function getVotes(
   request: HttpRequest,
   _context: InvocationContext,
 ): Promise<HttpResponseInit> {
   const sessionId = request.query.get('sessionId')
-  if (!sessionId) {
-    return { status: 400, jsonBody: { error: 'sessionId query parameter is required' } }
+  const campaignId = request.query.get('campaignId')
+
+  if (!sessionId || !campaignId) {
+    return { status: 400, jsonBody: { error: 'campaignId and sessionId query parameters are required' } }
   }
 
   const client = getVotesClient()
   const votedIds: string[] = []
+  const partKey = votePartitionKey(campaignId, sessionId)
   for await (const entity of client.listEntities({
-    queryOptions: { filter: `PartitionKey eq '${escapeODataString(sessionId)}'` },
+    queryOptions: { filter: `PartitionKey eq '${escapeODataString(partKey)}'` },
   })) {
     votedIds.push(entity.rowKey as string)
   }
@@ -31,20 +43,36 @@ async function postVote(
   request: HttpRequest,
   _context: InvocationContext,
 ): Promise<HttpResponseInit> {
-  const body = (await request.json()) as { sessionId?: string; suggestionId?: string; revoke?: boolean }
-  const { sessionId, suggestionId, revoke } = body
+  const body = (await request.json()) as {
+    campaignId?: string
+    questionId?: string
+    sessionId?: string
+    suggestionId?: string
+    revoke?: boolean
+  }
+  const { campaignId, questionId, sessionId, suggestionId, revoke } = body
 
-  if (!sessionId || !suggestionId) {
-    return { status: 400, jsonBody: { error: 'sessionId and suggestionId are required' } }
+  if (!campaignId || !questionId || !sessionId || !suggestionId) {
+    return {
+      status: 400,
+      jsonBody: { error: 'campaignId, questionId, sessionId and suggestionId are required' },
+    }
+  }
+
+  const campaign = getCampaign(campaignId)
+  if (!campaign) {
+    return { status: 404, jsonBody: { error: 'Campaign not found' } }
   }
 
   const votesClient = getVotesClient()
   const suggestionsClient = getSuggestionsClient()
+  const votePartKey = votePartitionKey(campaignId, sessionId)
+  const suggestionPartKey = suggestionPartitionKey(campaignId, questionId)
 
-  // Check current vote state
+  // Check current vote state for this suggestion
   let alreadyVoted = false
   try {
-    await votesClient.getEntity(sessionId, suggestionId)
+    await votesClient.getEntity(votePartKey, suggestionId)
     alreadyVoted = true
   } catch (err) {
     if (err instanceof RestError && err.statusCode === 404) {
@@ -54,17 +82,16 @@ async function postVote(
     }
   }
 
-  // Fetch suggestion to update its vote count
-  // rowKey is suggestionId, partitionKey is mascotId — query by RowKey across all partitions
+  // Fetch suggestion entity
   let suggestionEntity: TableEntityResult<SuggestionEntity> | undefined
-  let mascotId: string | undefined
   try {
     let found = false
     for await (const entity of suggestionsClient.listEntities<SuggestionEntity>({
-      queryOptions: { filter: `RowKey eq '${escapeODataString(suggestionId)}'` },
+      queryOptions: {
+        filter: `PartitionKey eq '${escapeODataString(suggestionPartKey)}' and RowKey eq '${escapeODataString(suggestionId)}'`,
+      },
     })) {
       suggestionEntity = entity
-      mascotId = entity.partitionKey as string
       found = true
       break
     }
@@ -75,7 +102,7 @@ async function postVote(
     return { status: 404, jsonBody: { error: 'Suggestion not found' } }
   }
 
-  if (!suggestionEntity || !mascotId) {
+  if (!suggestionEntity) {
     return { status: 404, jsonBody: { error: 'Suggestion not found' } }
   }
 
@@ -85,29 +112,64 @@ async function postVote(
     if (!alreadyVoted) {
       return { status: 409, jsonBody: { error: 'No vote to revoke' } }
     }
-    // Remove vote record and decrement
-    await votesClient.deleteEntity(sessionId, suggestionId)
+    await votesClient.deleteEntity(votePartKey, suggestionId)
     const newVotes = Math.max(0, currentVotes - 1)
     await suggestionsClient.updateEntity(
-      { partitionKey: mascotId, rowKey: suggestionId, votes: newVotes },
-      'Merge',
-    )
-    const updated = { ...entityToSuggestion(suggestionEntity), votes: newVotes }
-    return { status: 200, jsonBody: updated, headers: { 'Content-Type': 'application/json' } }
-  } else {
-    if (alreadyVoted) {
-      return { status: 409, jsonBody: { error: 'Already voted for this suggestion' } }
-    }
-    // Add vote record and increment
-    await votesClient.createEntity({ partitionKey: sessionId, rowKey: suggestionId })
-    const newVotes = currentVotes + 1
-    await suggestionsClient.updateEntity(
-      { partitionKey: mascotId, rowKey: suggestionId, votes: newVotes },
+      { partitionKey: suggestionPartKey, rowKey: suggestionId, votes: newVotes },
       'Merge',
     )
     const updated = { ...entityToSuggestion(suggestionEntity), votes: newVotes }
     return { status: 200, jsonBody: updated, headers: { 'Content-Type': 'application/json' } }
   }
+
+  // Adding a vote — check campaign rules
+  if (!campaign.allowMultipleVotesPerSuggestion && alreadyVoted) {
+    return { status: 409, jsonBody: { error: 'Already voted for this suggestion' } }
+  }
+
+  // Enforce maxVotesPerUser: count all votes cast by this session in this campaign
+  if (campaign.maxVotesPerUser > 0) {
+    let totalVotes = 0
+    for await (const _entity of votesClient.listEntities<VoteEntity>({
+      queryOptions: { filter: `PartitionKey eq '${escapeODataString(votePartKey)}'` },
+    })) {
+      totalVotes++
+    }
+    if (totalVotes >= campaign.maxVotesPerUser) {
+      return {
+        status: 409,
+        jsonBody: { error: `You have reached the maximum of ${campaign.maxVotesPerUser} votes for this campaign` },
+      }
+    }
+  }
+
+  const createdAt = new Date().toISOString()
+  if (alreadyVoted) {
+    // allowMultipleVotesPerSuggestion = true: store a new vote entry with unique rowKey
+    const voteRowKey = `${suggestionId}|${crypto.randomUUID()}`
+    await votesClient.createEntity({
+      partitionKey: votePartKey,
+      rowKey: voteRowKey,
+      questionId,
+      createdAt,
+    })
+  } else {
+    // Standard: rowKey = suggestionId (one entry per suggestion)
+    await votesClient.createEntity({
+      partitionKey: votePartKey,
+      rowKey: suggestionId,
+      questionId,
+      createdAt,
+    })
+  }
+
+  const newVotes = currentVotes + 1
+  await suggestionsClient.updateEntity(
+    { partitionKey: suggestionPartKey, rowKey: suggestionId, votes: newVotes },
+    'Merge',
+  )
+  const updated = { ...entityToSuggestion(suggestionEntity), votes: newVotes }
+  return { status: 200, jsonBody: updated, headers: { 'Content-Type': 'application/json' } }
 }
 
 app.http('getVotes', {

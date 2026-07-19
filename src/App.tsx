@@ -1,22 +1,25 @@
 import { useEffect, useState } from 'react'
 import './App.css'
 import { Leaderboard } from './components/Leaderboard'
-import { MascotCard } from './components/MascotCard'
+import { QuestionCard } from './components/QuestionCard'
 import { SuggestionBoard } from './components/SuggestionBoard'
 import { SuggestionForm } from './components/SuggestionForm'
-import { mascots } from './data/mascots'
+import { defaultCampaign, questions } from './data/campaign'
 import type { Suggestion } from './types'
 import { fetchSuggestions, fetchVotedIds, postSuggestion, postVote } from './api'
 import { getSessionId } from './utils/sessionId'
 
 function App() {
-  const [selectedMascotId, setSelectedMascotId] = useState(mascots[0]?.id ?? '')
+  const [selectedQuestionId, setSelectedQuestionId] = useState(questions[0]?.id ?? '')
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const [votedIds, setVotedIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     const sessionId = getSessionId()
-    Promise.all([fetchSuggestions(), fetchVotedIds(sessionId)]).then(
+    Promise.all([
+      fetchSuggestions(defaultCampaign.id),
+      fetchVotedIds(defaultCampaign.id, sessionId),
+    ]).then(
       ([loadedSuggestions, loadedVotedIds]) => {
         setSuggestions(loadedSuggestions)
         setVotedIds(loadedVotedIds)
@@ -27,14 +30,14 @@ function App() {
   }, [])
 
   const handleSuggestionSubmit = (name: string) => {
-    if (!selectedMascotId) {
+    if (!selectedQuestionId) {
       return
     }
 
     // Client-side duplicate guard (UX): normalise and skip if already present
     const isDuplicate = suggestions.some(
       (s) =>
-        s.mascotId === selectedMascotId &&
+        s.questionId === selectedQuestionId &&
         s.name.trim().toLowerCase() === name.trim().toLowerCase(),
     )
     if (isDuplicate) {
@@ -45,7 +48,8 @@ function App() {
     const tempId = crypto.randomUUID()
     const optimistic: Suggestion = {
       id: tempId,
-      mascotId: selectedMascotId,
+      campaignId: defaultCampaign.id,
+      questionId: selectedQuestionId,
       name: name.trim(),
       createdAt: new Date().toISOString(),
       votes: 0,
@@ -53,7 +57,7 @@ function App() {
     setSuggestions((current) => [...current, optimistic])
 
     // Persist to backend and swap the temp entry for the server-assigned one
-    postSuggestion(selectedMascotId, name.trim())
+    postSuggestion(defaultCampaign.id, selectedQuestionId, name.trim())
       .then((created) => {
         if (created) {
           setSuggestions((current) =>
@@ -72,8 +76,16 @@ function App() {
   const handleVote = async (suggestionId: string) => {
     const hasVoted = votedIds.has(suggestionId)
     const sessionId = getSessionId()
+    const suggestion = suggestions.find((s) => s.id === suggestionId)
+    if (!suggestion) return
 
-    const updated = await postVote(suggestionId, sessionId, hasVoted)
+    const updated = await postVote(
+      defaultCampaign.id,
+      suggestion.questionId,
+      suggestionId,
+      sessionId,
+      hasVoted,
+    )
 
     setSuggestions((current) =>
       current.map((s) => {
@@ -97,40 +109,39 @@ function App() {
     <main className="app-shell">
       <section className="hero">
         <p className="hero__eyebrow">MOODMILE</p>
-        <h1>Help Name Our Ninjas</h1>
+        <h1>{defaultCampaign.title}</h1>
         <p>
-          These four ninjas need names.
-          Choose a ninja, suggest a name and vote for your favorites.
+          {defaultCampaign.description}
         </p>
       </section>
 
-      <section className="mascots" aria-label="Mascot options">
-        {mascots.map((mascot) => (
-          <MascotCard
-            key={mascot.id}
-            mascot={mascot}
-            isSelected={selectedMascotId === mascot.id}
-            onSelect={setSelectedMascotId}
+      <section className="mascots" aria-label="Questions">
+        {questions.map((question) => (
+          <QuestionCard
+            key={question.id}
+            question={question}
+            isSelected={selectedQuestionId === question.id}
+            onSelect={setSelectedQuestionId}
           />
         ))}
       </section>
 
       <SuggestionForm
-        mascots={mascots}
-        selectedMascotId={selectedMascotId}
-        onMascotChange={setSelectedMascotId}
+        questions={questions}
+        selectedQuestionId={selectedQuestionId}
+        onQuestionChange={setSelectedQuestionId}
         onSubmitSuggestion={handleSuggestionSubmit}
       />
 
       <SuggestionBoard
-        mascots={mascots}
+        questions={questions}
         suggestions={suggestions}
         votedIds={votedIds}
         onVote={handleVote}
       />
 
       <Leaderboard
-        mascots={mascots}
+        questions={questions}
         suggestions={suggestions}
         votedIds={votedIds}
         onVote={handleVote}

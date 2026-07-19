@@ -7,11 +7,11 @@ import type { Suggestion } from './types'
 // ---------------------------------------------------------------------------
 // Mock the API module so tests never make real HTTP calls
 // ---------------------------------------------------------------------------
-const mockFetchSuggestions = vi.fn<() => Promise<Suggestion[]>>()
-const mockFetchVotedIds = vi.fn<() => Promise<Set<string>>>()
-const mockPostSuggestion = vi.fn<(mascotId: string, name: string) => Promise<Suggestion | null>>()
+const mockFetchSuggestions = vi.fn<(campaignId: string) => Promise<Suggestion[]>>()
+const mockFetchVotedIds = vi.fn<(campaignId: string, sessionId: string) => Promise<Set<string>>>()
+const mockPostSuggestion = vi.fn<(campaignId: string, questionId: string, name: string) => Promise<Suggestion | null>>()
 const mockPostVote = vi.fn<
-  (suggestionId: string, sessionId: string, revoke: boolean) => Promise<Suggestion | null>
+  (campaignId: string, questionId: string, suggestionId: string, sessionId: string, revoke: boolean) => Promise<Suggestion | null>
 >()
 
 vi.mock('./api', () => ({
@@ -28,7 +28,8 @@ vi.mock('./api', () => ({
 
 const testSuggestion: Suggestion = {
   id: 'test-suggestion-1',
-  mascotId: 'comet',
+  campaignId: 'ninja-naming',
+  questionId: 'ninja-1',
   name: 'Rocket',
   createdAt: new Date().toISOString(),
   votes: 0,
@@ -40,14 +41,15 @@ function setupApi(
 ) {
   mockFetchSuggestions.mockResolvedValue(suggestions)
   mockFetchVotedIds.mockResolvedValue(new Set(votedIds))
-  mockPostSuggestion.mockImplementation(async (mascotId, name) => {
+  mockPostSuggestion.mockImplementation(async (campaignId, questionId, name) => {
     const isDuplicate = suggestions.some(
-      (s) => s.mascotId === mascotId && s.name.trim().toLowerCase() === name.trim().toLowerCase(),
+      (s) => s.questionId === questionId && s.name.trim().toLowerCase() === name.trim().toLowerCase(),
     )
     if (isDuplicate) return null
     const created: Suggestion = {
       id: `new-${suggestions.length + 1}`,
-      mascotId,
+      campaignId,
+      questionId,
       name,
       createdAt: new Date().toISOString(),
       votes: 0,
@@ -55,7 +57,7 @@ function setupApi(
     suggestions.push(created)
     return created
   })
-  mockPostVote.mockImplementation(async (suggestionId, _sessionId, revoke) => {
+  mockPostVote.mockImplementation(async (_campaignId, _questionId, suggestionId, _sessionId, revoke) => {
     const idx = suggestions.findIndex((s) => s.id === suggestionId)
     if (idx === -1) return null
     const updated = { ...suggestions[idx], votes: revoke ? suggestions[idx].votes - 1 : suggestions[idx].votes + 1 }
@@ -73,9 +75,9 @@ function getVoteCount(): number {
 }
 
 const threeSuggestions: Suggestion[] = [
-  { id: 'hanzo', mascotId: 'comet', name: 'Hanzo', createdAt: '2024-01-01T00:00:00.000Z', votes: 0 },
-  { id: 'yuki', mascotId: 'comet', name: 'Yuki', createdAt: '2024-01-02T00:00:00.000Z', votes: 0 },
-  { id: 'kimi', mascotId: 'comet', name: 'Kimi', createdAt: '2024-01-03T00:00:00.000Z', votes: 0 },
+  { id: 'hanzo', campaignId: 'ninja-naming', questionId: 'ninja-1', name: 'Hanzo', createdAt: '2024-01-01T00:00:00.000Z', votes: 0 },
+  { id: 'yuki', campaignId: 'ninja-naming', questionId: 'ninja-1', name: 'Yuki', createdAt: '2024-01-02T00:00:00.000Z', votes: 0 },
+  { id: 'kimi', campaignId: 'ninja-naming', questionId: 'ninja-1', name: 'Kimi', createdAt: '2024-01-03T00:00:00.000Z', votes: 0 },
 ]
 
 beforeEach(() => {
@@ -187,9 +189,9 @@ describe('voting', () => {
 describe('suggestion board ordering', () => {
   it('renders suggestions in creation-date order regardless of vote counts', async () => {
     const suggestions: Suggestion[] = [
-      { id: 'a', mascotId: 'comet', name: 'Alpha', createdAt: '2024-01-01T00:00:00.000Z', votes: 10 },
-      { id: 'b', mascotId: 'comet', name: 'Beta', createdAt: '2024-01-02T00:00:00.000Z', votes: 0 },
-      { id: 'c', mascotId: 'comet', name: 'Gamma', createdAt: '2024-01-03T00:00:00.000Z', votes: 5 },
+      { id: 'a', campaignId: 'ninja-naming', questionId: 'ninja-1', name: 'Alpha', createdAt: '2024-01-01T00:00:00.000Z', votes: 10 },
+      { id: 'b', campaignId: 'ninja-naming', questionId: 'ninja-1', name: 'Beta', createdAt: '2024-01-02T00:00:00.000Z', votes: 0 },
+      { id: 'c', campaignId: 'ninja-naming', questionId: 'ninja-1', name: 'Gamma', createdAt: '2024-01-03T00:00:00.000Z', votes: 5 },
     ]
     setupApi(suggestions)
     render(<App />)
@@ -204,8 +206,8 @@ describe('suggestion board ordering', () => {
 
   it('does not re-order suggestion cards after voting', async () => {
     const suggestions: Suggestion[] = [
-      { id: 'a', mascotId: 'comet', name: 'Alpha', createdAt: '2024-01-01T00:00:00.000Z', votes: 0 },
-      { id: 'b', mascotId: 'comet', name: 'Beta', createdAt: '2024-01-02T00:00:00.000Z', votes: 0 },
+      { id: 'a', campaignId: 'ninja-naming', questionId: 'ninja-1', name: 'Alpha', createdAt: '2024-01-01T00:00:00.000Z', votes: 0 },
+      { id: 'b', campaignId: 'ninja-naming', questionId: 'ninja-1', name: 'Beta', createdAt: '2024-01-02T00:00:00.000Z', votes: 0 },
     ]
     setupApi(suggestions)
     render(<App />)
@@ -240,7 +242,7 @@ describe('duplicate suggestions', () => {
     )
   }
 
-  it('does not add a duplicate suggestion with the same name for the same mascot', async () => {
+  it('does not add a duplicate suggestion with the same name for the same question', async () => {
     setupApi()
     render(<App />)
     await submitSuggestion('Comet')
@@ -264,11 +266,11 @@ describe('duplicate suggestions', () => {
     expect(getSuggestionNames()).toHaveLength(1)
   })
 
-  it('allows the same name for different mascots', async () => {
+  it('allows the same name for different questions', async () => {
     setupApi()
     render(<App />)
 
-    const select = screen.getByRole('combobox', { name: /mascot/i })
+    const select = screen.getByRole('combobox', { name: /question/i })
     const options = Array.from(select.querySelectorAll('option'))
     if (options.length < 2) {
       return
@@ -348,9 +350,9 @@ describe('input validation', () => {
 describe('leaderboard', () => {
   it('renders suggestions sorted by vote count descending', async () => {
     const suggestions: Suggestion[] = [
-      { id: 'a', mascotId: 'comet', name: 'Alpha', createdAt: '2024-01-01T00:00:00.000Z', votes: 2 },
-      { id: 'b', mascotId: 'comet', name: 'Beta', createdAt: '2024-01-02T00:00:00.000Z', votes: 5 },
-      { id: 'c', mascotId: 'comet', name: 'Gamma', createdAt: '2024-01-03T00:00:00.000Z', votes: 1 },
+      { id: 'a', campaignId: 'ninja-naming', questionId: 'ninja-1', name: 'Alpha', createdAt: '2024-01-01T00:00:00.000Z', votes: 2 },
+      { id: 'b', campaignId: 'ninja-naming', questionId: 'ninja-1', name: 'Beta', createdAt: '2024-01-02T00:00:00.000Z', votes: 5 },
+      { id: 'c', campaignId: 'ninja-naming', questionId: 'ninja-1', name: 'Gamma', createdAt: '2024-01-03T00:00:00.000Z', votes: 1 },
     ]
     setupApi(suggestions)
     render(<App />)
@@ -365,8 +367,8 @@ describe('leaderboard', () => {
 
   it('updates leaderboard order live when a vote changes the ranking', async () => {
     const suggestions: Suggestion[] = [
-      { id: 'a', mascotId: 'comet', name: 'Alpha', createdAt: '2024-01-01T00:00:00.000Z', votes: 0 },
-      { id: 'b', mascotId: 'comet', name: 'Beta', createdAt: '2024-01-02T00:00:00.000Z', votes: 1 },
+      { id: 'a', campaignId: 'ninja-naming', questionId: 'ninja-1', name: 'Alpha', createdAt: '2024-01-01T00:00:00.000Z', votes: 0 },
+      { id: 'b', campaignId: 'ninja-naming', questionId: 'ninja-1', name: 'Beta', createdAt: '2024-01-02T00:00:00.000Z', votes: 1 },
     ]
     setupApi(suggestions)
     render(<App />)

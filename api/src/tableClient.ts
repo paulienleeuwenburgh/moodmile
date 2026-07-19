@@ -22,17 +22,37 @@ function getTableClient(tableName: string): TableClient {
   )
 }
 
+/**
+ * Partition key for a suggestion row.
+ * Format: "{campaignId}|{questionId}"
+ */
+export function suggestionPartitionKey(campaignId: string, questionId: string): string {
+  return `${campaignId}|${questionId}`
+}
+
+/**
+ * Partition key for a vote row.
+ * Format: "{campaignId}|{sessionId}"
+ */
+export function votePartitionKey(campaignId: string, sessionId: string): string {
+  return `${campaignId}|${sessionId}`
+}
+
 export interface SuggestionEntity {
-  partitionKey: string
-  rowKey: string
+  partitionKey: string // "{campaignId}|{questionId}"
+  rowKey: string       // suggestionId
+  campaignId: string
+  questionId: string
   name: string
   createdAt: string
   votes: number
 }
 
 export interface VoteEntity {
-  partitionKey: string
-  rowKey: string
+  partitionKey: string // "{campaignId}|{sessionId}"
+  rowKey: string       // suggestionId
+  questionId: string
+  createdAt: string
 }
 
 export function getSuggestionsClient(): TableClient {
@@ -46,7 +66,8 @@ export function getVotesClient(): TableClient {
 export function entityToSuggestion(entity: TableEntityResult<SuggestionEntity>) {
   return {
     id: entity.rowKey,
-    mascotId: entity.partitionKey,
+    campaignId: entity.campaignId ?? entity.partitionKey.split('|')[0],
+    questionId: entity.questionId ?? entity.partitionKey.split('|')[1],
     name: entity.name,
     createdAt: entity.createdAt,
     votes: entity.votes ?? 0,

@@ -1,33 +1,33 @@
-import type { Mascot, Suggestion } from '../types'
+import type { Question, Suggestion } from '../types'
 
 interface SuggestionBoardProps {
-  mascots: Mascot[]
+  questions: Question[]
   suggestions: Suggestion[]
   votedIds: Set<string>
   onVote: (suggestionId: string) => void | Promise<void>
 }
 
-export function SuggestionBoard({ mascots, suggestions, votedIds, onVote }: SuggestionBoardProps) {
+export function SuggestionBoard({ questions, suggestions, votedIds, onVote }: SuggestionBoardProps) {
   return (
-    <section className="suggestion-board" aria-label="Suggestions by mascot">
-      <h2>Suggestions by mascot</h2>
+    <section className="suggestion-board" aria-label="Suggestions by question">
+      <h2>Suggestions by question</h2>
       <div className="suggestion-board__grid">
-        {mascots.map((mascot) => {
-          const mascotSuggestions = suggestions
-            .filter((suggestion) => suggestion.mascotId === mascot.id)
+        {questions.map((question) => {
+          const questionSuggestions = suggestions
+            .filter((suggestion) => suggestion.questionId === question.id)
             .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
 
           return (
-            <article key={mascot.id} className="suggestion-group">
+            <article key={question.id} className="suggestion-group">
               <header>
-                <img src={mascot.image} alt="" aria-hidden="true" />
-                <h3>{mascot.title}</h3>
+                {question.imageUrl && <img src={question.imageUrl} alt="" aria-hidden="true" />}
+                <h3>{question.title}</h3>
               </header>
-              {mascotSuggestions.length === 0 ? (
+              {questionSuggestions.length === 0 ? (
                 <p className="suggestion-group__empty">No suggestions yet — be the first!</p>
               ) : (
                 <ul>
-                  {mascotSuggestions.map((suggestion) => {
+                  {questionSuggestions.map((suggestion) => {
                     const hasVoted = votedIds.has(suggestion.id)
                     return (
                       <li key={suggestion.id} className="suggestion-card">
