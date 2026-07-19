@@ -1,5 +1,11 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions'
-import { entityToSuggestion, getSuggestionsClient, suggestionPartitionKey, SuggestionEntity } from '../tableClient'
+import {
+  ensureTableExists,
+  entityToSuggestion,
+  getSuggestionsClient,
+  suggestionPartitionKey,
+  SuggestionEntity,
+} from '../tableClient'
 import { escapeODataString } from '../odata'
 import { getCampaign } from '../campaigns'
 
@@ -9,6 +15,7 @@ async function getSuggestions(
 ): Promise<HttpResponseInit> {
   const campaignId = request.query.get('campaignId')
   const client = getSuggestionsClient()
+  await ensureTableExists(client)
   const suggestions = []
 
   // Filter all partition keys that start with "{campaignId}|".
@@ -52,6 +59,7 @@ async function postSuggestion(
   }
 
   const client = getSuggestionsClient()
+  await ensureTableExists(client)
   const partitionKey = suggestionPartitionKey(campaignId, questionId)
 
   // Duplicate check: normalise to lowercase and compare

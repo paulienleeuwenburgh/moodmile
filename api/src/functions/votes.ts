@@ -1,6 +1,7 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions'
 import { RestError, type TableEntityResult } from '@azure/data-tables'
 import {
+  ensureTableExists,
   entityToSuggestion,
   getSuggestionsClient,
   getVotesClient,
@@ -24,6 +25,7 @@ async function getVotes(
   }
 
   const client = getVotesClient()
+  await ensureTableExists(client)
   const votedIds: string[] = []
   const partKey = votePartitionKey(campaignId, sessionId)
   for await (const entity of client.listEntities({
@@ -66,6 +68,7 @@ async function postVote(
 
   const votesClient = getVotesClient()
   const suggestionsClient = getSuggestionsClient()
+  await Promise.all([ensureTableExists(votesClient), ensureTableExists(suggestionsClient)])
   const votePartKey = votePartitionKey(campaignId, sessionId)
   const suggestionPartKey = suggestionPartitionKey(campaignId, questionId)
 

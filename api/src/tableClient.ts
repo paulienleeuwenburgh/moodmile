@@ -1,4 +1,6 @@
-import { TableClient, AzureNamedKeyCredential, TableEntityResult } from '@azure/data-tables'
+import { TableClient, AzureNamedKeyCredential, TableEntityResult, RestError } from '@azure/data-tables'
+
+const ensuredTables = new Set<string>()
 
 function getTableClient(tableName: string): TableClient {
   const connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING
@@ -15,6 +17,22 @@ function getTableClient(tableName: string): TableClient {
       tableName,
       credential,
     )
+  }
+
+  export async function ensureTableExists(client: TableClient): Promise<void> {
+    if (ensuredTables.has(client.tableName)) {
+      return
+    }
+
+    try {
+      await client.createTable()
+    } catch (err) {
+      if (!(err instanceof RestError) || err.statusCode !== 409) {
+        throw err
+      }
+    }
+
+    ensuredTables.add(client.tableName)
   }
 
   throw new Error(
