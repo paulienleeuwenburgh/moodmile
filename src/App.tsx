@@ -96,12 +96,11 @@ function App() {
   return (
     <main className="app-shell">
       <section className="hero">
-        <p className="hero__eyebrow">MoodMile 🥷 Ninja Naming Contest</p>
-        <h1>Name Our Ninja Mascots</h1>
+        <p className="hero__eyebrow">MOODMILE</p>
+        <h1>Help Name Our Ninjas</h1>
         <p>
-          Four mysterious ninjas have joined the MoodMile squad — and they need names.
-          Pick your favorite ninja, drop as many name ideas as you like, and vote for
-          the ones that feel just right.
+          These four ninjas need names.
+          Choose a ninja, suggest a name and vote for your favorites.
         </p>
       </section>
 
