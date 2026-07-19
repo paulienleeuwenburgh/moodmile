@@ -19,25 +19,25 @@ function getTableClient(tableName: string): TableClient {
     )
   }
 
-  export async function ensureTableExists(client: TableClient): Promise<void> {
-    if (ensuredTables.has(client.tableName)) {
-      return
-    }
-
-    try {
-      await client.createTable()
-    } catch (err) {
-      if (!(err instanceof RestError) || err.statusCode !== 409) {
-        throw err
-      }
-    }
-
-    ensuredTables.add(client.tableName)
-  }
-
   throw new Error(
     'Azure Storage credentials not configured. Set AZURE_STORAGE_CONNECTION_STRING or both AZURE_STORAGE_ACCOUNT_NAME and AZURE_STORAGE_ACCOUNT_KEY.',
   )
+}
+
+export async function ensureTableExists(client: TableClient): Promise<void> {
+  if (ensuredTables.has(client.tableName)) {
+    return
+  }
+
+  try {
+    await client.createTable()
+  } catch (err) {
+    if (!(err instanceof RestError) || err.statusCode !== 409) {
+      throw err
+    }
+  }
+
+  ensuredTables.add(client.tableName)
 }
 
 /**
