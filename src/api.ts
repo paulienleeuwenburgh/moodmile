@@ -1,4 +1,4 @@
-import type { Suggestion } from './types'
+import type { Campaign, Question, Suggestion } from './types'
 
 const BASE = '/api'
 
@@ -9,6 +9,14 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error((body as { error?: string }).error ?? `HTTP ${response.status}`)
   }
   return response.json() as Promise<T>
+}
+
+export async function fetchCampaign(): Promise<Campaign> {
+  return apiFetch<Campaign>('/campaign')
+}
+
+export async function fetchQuestions(campaignId: string): Promise<Question[]> {
+  return apiFetch<Question[]>(`/questions?campaignId=${encodeURIComponent(campaignId)}`)
 }
 
 export async function fetchSuggestions(campaignId: string): Promise<Suggestion[]> {

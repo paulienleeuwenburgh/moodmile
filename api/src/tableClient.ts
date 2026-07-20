@@ -56,6 +56,81 @@ export function votePartitionKey(campaignId: string, sessionId: string): string 
   return `${campaignId}|${sessionId}`
 }
 
+// ─── Campaign entities ────────────────────────────────────────────────────────
+
+/**
+ * Campaign row in the 'campaigns' table.
+ * partitionKey = 'campaign'  (constant – groups all campaigns in one partition)
+ * rowKey       = campaignId  (e.g. 'ninja-naming')
+ */
+export interface CampaignEntity {
+  partitionKey: string
+  rowKey: string       // campaignId
+  title: string
+  description: string
+  status: string       // e.g. 'active' | 'closed'
+  allowSuggestions: boolean
+  maxVotesTotal: number
+  maxVotesPerCategory: number
+  maxVotesPerCandidate: number
+  createdAt: string
+  updatedAt: string
+}
+
+/**
+ * Question row in the 'questions' table.
+ * partitionKey = campaignId  (e.g. 'ninja-naming')
+ * rowKey       = questionId  (e.g. 'ninja-1')
+ */
+export interface QuestionEntity {
+  partitionKey: string // campaignId
+  rowKey: string       // questionId
+  title: string
+  description: string
+  imageUrl?: string
+  sortOrder: number
+  createdAt: string
+  updatedAt: string
+}
+
+export function getCampaignsClient(): TableClient {
+  return getTableClient('campaigns')
+}
+
+export function getQuestionsClient(): TableClient {
+  return getTableClient('questions')
+}
+
+export function entityToCampaignConfig(entity: TableEntityResult<CampaignEntity>) {
+  return {
+    id: entity.rowKey as string,
+    title: entity.title,
+    description: entity.description,
+    status: entity.status,
+    allowSuggestions: entity.allowSuggestions,
+    maxVotesTotal: entity.maxVotesTotal,
+    maxVotesPerCategory: entity.maxVotesPerCategory,
+    maxVotesPerCandidate: entity.maxVotesPerCandidate,
+    createdAt: entity.createdAt,
+    updatedAt: entity.updatedAt,
+  }
+}
+
+export function entityToQuestion(entity: TableEntityResult<QuestionEntity>) {
+  return {
+    id: entity.rowKey as string,
+    campaignId: entity.partitionKey as string,
+    title: entity.title,
+    description: entity.description,
+    imageUrl: entity.imageUrl,
+    sortOrder: entity.sortOrder,
+    createdAt: entity.createdAt,
+    updatedAt: entity.updatedAt,
+  }
+}
+
+// ─── Suggestion / Vote entities ───────────────────────────────────────────────
+
 export interface SuggestionEntity {
   partitionKey: string // "{campaignId}|{questionId}"
   rowKey: string       // suggestionId

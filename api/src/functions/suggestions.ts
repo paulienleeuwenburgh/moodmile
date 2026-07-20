@@ -49,7 +49,7 @@ async function postSuggestion(
     return { status: 400, jsonBody: { error: 'campaignId, questionId and name are required' } }
   }
 
-  const campaign = getCampaign(campaignId)
+  const campaign = await getCampaign(campaignId)
   if (!campaign) {
     return { status: 404, jsonBody: { error: 'Campaign not found' } }
   }

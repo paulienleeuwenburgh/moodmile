@@ -5,31 +5,44 @@ import { QuestionCard } from './components/QuestionCard'
 import { SuggestionBoard } from './components/SuggestionBoard'
 import { SuggestionForm } from './components/SuggestionForm'
 import { VotingRules } from './components/VotingRules'
-import { defaultCampaign, questions } from './data/campaign'
-import type { Suggestion } from './types'
-import { fetchSuggestions, fetchVotedIds, postSuggestion, postVote } from './api'
+import { defaultCampaign, questions as defaultQuestions } from './data/campaign'
+import type { Campaign, Question, Suggestion } from './types'
+import { fetchCampaign, fetchQuestions, fetchSuggestions, fetchVotedIds, postSuggestion, postVote } from './api'
 import { getSessionId } from './utils/sessionId'
 import { canCastVote, getClientVoteRecords } from './utils/voteLimits'
 
 function App() {
-  const [selectedQuestionId, setSelectedQuestionId] = useState(questions[0]?.id ?? '')
+  const [campaign, setCampaign] = useState<Campaign>(defaultCampaign)
+  const [questions, setQuestions] = useState<Question[]>(defaultQuestions)
+  const [selectedQuestionId, setSelectedQuestionId] = useState(defaultQuestions[0]?.id ?? '')
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const [votedIds, setVotedIds] = useState<Set<string>>(new Set())
   const voteRecords = getClientVoteRecords(suggestions, votedIds)
 
   useEffect(() => {
     const sessionId = getSessionId()
-    Promise.all([
-      fetchSuggestions(defaultCampaign.id),
-      fetchVotedIds(defaultCampaign.id, sessionId),
-    ]).then(
-      ([loadedSuggestions, loadedVotedIds]) => {
+    fetchCampaign()
+      .then((loadedCampaign) => {
+        const id = loadedCampaign.id
+        return Promise.all([
+          Promise.resolve(loadedCampaign),
+          fetchQuestions(id),
+          fetchSuggestions(id),
+          fetchVotedIds(id, sessionId),
+        ])
+      })
+      .then(([loadedCampaign, loadedQuestions, loadedSuggestions, loadedVotedIds]) => {
+        setCampaign(loadedCampaign)
+        setQuestions(loadedQuestions)
+        if (loadedQuestions.length > 0) {
+          setSelectedQuestionId(loadedQuestions[0].id)
+        }
         setSuggestions(loadedSuggestions)
         setVotedIds(loadedVotedIds)
-      },
-    ).catch(() => {
-      // Data load failed — the app remains functional with empty state
-    })
+      })
+      .catch(() => {
+        // Data load failed — the app remains functional with empty state
+      })
   }, [])
 
   const handleSuggestionSubmit = (name: string) => {
@@ -51,7 +64,7 @@ function App() {
     const tempId = crypto.randomUUID()
     const optimistic: Suggestion = {
       id: tempId,
-      campaignId: defaultCampaign.id,
+      campaignId: campaign.id,
       questionId: selectedQuestionId,
       name: name.trim(),
       createdAt: new Date().toISOString(),
@@ -60,7 +73,7 @@ function App() {
     setSuggestions((current) => [...current, optimistic])
 
     // Persist to backend and swap the temp entry for the server-assigned one
-    postSuggestion(defaultCampaign.id, selectedQuestionId, name.trim())
+    postSuggestion(campaign.id, selectedQuestionId, name.trim())
       .then((created) => {
         if (created) {
           setSuggestions((current) =>
@@ -82,12 +95,12 @@ function App() {
     const suggestion = suggestions.find((s) => s.id === suggestionId)
     if (!suggestion) return
 
-    if (!hasVoted && !canCastVote(defaultCampaign, voteRecords, suggestion.questionId, suggestion.id)) {
+    if (!hasVoted && !canCastVote(campaign, voteRecords, suggestion.questionId, suggestion.id)) {
       return
     }
 
     const updated = await postVote(
-      defaultCampaign.id,
+      campaign.id,
       suggestion.questionId,
       suggestionId,
       sessionId,
@@ -123,16 +136,16 @@ function App() {
     }
 
     return !votedIds.has(suggestionId)
-      && !canCastVote(defaultCampaign, voteRecords, suggestion.questionId, suggestion.id)
+      && !canCastVote(campaign, voteRecords, suggestion.questionId, suggestion.id)
   }
 
   return (
     <main className="app-shell">
       <section className="hero">
         <p className="hero__eyebrow">MOODMILE</p>
-        <h1>{defaultCampaign.title}</h1>
+        <h1>{campaign.title}</h1>
         <p>
-          {defaultCampaign.description}
+          {campaign.description}
         </p>
       </section>
 
@@ -148,9 +161,9 @@ function App() {
       </section>
 
       <VotingRules
-        maxVotesTotal={defaultCampaign.maxVotesTotal}
-        maxVotesPerCategory={defaultCampaign.maxVotesPerCategory}
-        maxVotesPerCandidate={defaultCampaign.maxVotesPerCandidate}
+        maxVotesTotal={campaign.maxVotesTotal}
+        maxVotesPerCategory={campaign.maxVotesPerCategory}
+        maxVotesPerCandidate={campaign.maxVotesPerCandidate}
         votesUsed={voteRecords.length}
       />
 

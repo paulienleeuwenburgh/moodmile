@@ -92,7 +92,7 @@ async function postVote(
     }
   }
 
-  const campaign = getCampaign(campaignId)
+  const campaign = await getCampaign(campaignId)
   if (!campaign) {
     return { status: 404, jsonBody: { error: 'Campaign not found' } }
   }
