@@ -9,11 +9,13 @@ import { defaultCampaign, questions } from './data/campaign'
 import type { Suggestion } from './types'
 import { fetchSuggestions, fetchVotedIds, postSuggestion, postVote } from './api'
 import { getSessionId } from './utils/sessionId'
+import { canCastVote, getClientVoteRecords } from './utils/voteLimits'
 
 function App() {
   const [selectedQuestionId, setSelectedQuestionId] = useState(questions[0]?.id ?? '')
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const [votedIds, setVotedIds] = useState<Set<string>>(new Set())
+  const voteRecords = getClientVoteRecords(suggestions, votedIds)
 
   useEffect(() => {
     const sessionId = getSessionId()
@@ -80,6 +82,10 @@ function App() {
     const suggestion = suggestions.find((s) => s.id === suggestionId)
     if (!suggestion) return
 
+    if (!hasVoted && !canCastVote(defaultCampaign, voteRecords, suggestion.questionId, suggestion.id)) {
+      return
+    }
+
     const updated = await postVote(
       defaultCampaign.id,
       suggestion.questionId,
@@ -88,10 +94,14 @@ function App() {
       hasVoted,
     )
 
+    if (!updated) {
+      return
+    }
+
     setSuggestions((current) =>
       current.map((s) => {
         if (s.id !== suggestionId) return s
-        return updated ?? { ...s, votes: hasVoted ? s.votes - 1 : s.votes + 1 }
+        return updated
       }),
     )
 
@@ -104,6 +114,16 @@ function App() {
       }
       return next
     })
+  }
+
+  const isVoteDisabled = (suggestionId: string) => {
+    const suggestion = suggestions.find((item) => item.id === suggestionId)
+    if (!suggestion) {
+      return false
+    }
+
+    return !votedIds.has(suggestionId)
+      && !canCastVote(defaultCampaign, voteRecords, suggestion.questionId, suggestion.id)
   }
 
   return (
@@ -131,7 +151,7 @@ function App() {
         maxVotesTotal={defaultCampaign.maxVotesTotal}
         maxVotesPerCategory={defaultCampaign.maxVotesPerCategory}
         maxVotesPerCandidate={defaultCampaign.maxVotesPerCandidate}
-        votesUsed={votedIds.size}
+        votesUsed={voteRecords.length}
       />
 
       <SuggestionForm
@@ -146,6 +166,7 @@ function App() {
         suggestions={suggestions}
         votedIds={votedIds}
         onVote={handleVote}
+        isVoteDisabled={isVoteDisabled}
       />
 
       <Leaderboard
@@ -153,6 +174,7 @@ function App() {
         suggestions={suggestions}
         votedIds={votedIds}
         onVote={handleVote}
+        isVoteDisabled={isVoteDisabled}
       />
     </main>
   )
