@@ -5,9 +5,12 @@ export interface Campaign {
   status: string
   createdAt: string
   allowSuggestions: boolean
-  maxVotesPerUser: number
-  allowMultipleVotesPerSuggestion: boolean
-  votingMode: string
+  /** Maximum votes a user may cast across the entire campaign. 0 = unlimited. */
+  maxVotesTotal: number
+  /** Maximum votes a user may cast within a single category (question). 0 = unlimited. */
+  maxVotesPerCategory: number
+  /** Maximum votes a user may cast for a single candidate (suggestion). 0 = unlimited. */
+  maxVotesPerCandidate: number
 }
 
 export interface Question {

@@ -4,9 +4,12 @@ export interface CampaignConfig {
   description: string
   status: string
   allowSuggestions: boolean
-  maxVotesPerUser: number
-  allowMultipleVotesPerSuggestion: boolean
-  votingMode: string
+  /** Maximum votes a user may cast across the entire campaign. 0 = unlimited. */
+  maxVotesTotal: number
+  /** Maximum votes a user may cast within a single category (question). 0 = unlimited. */
+  maxVotesPerCategory: number
+  /** Maximum votes a user may cast for a single candidate (suggestion). 0 = unlimited. */
+  maxVotesPerCandidate: number
 }
 
 export const campaigns: CampaignConfig[] = [
@@ -16,9 +19,9 @@ export const campaigns: CampaignConfig[] = [
     description: 'Help us name our four ninja mascots by suggesting and voting for your favorites.',
     status: 'active',
     allowSuggestions: true,
-    maxVotesPerUser: 4,
-    allowMultipleVotesPerSuggestion: false,
-    votingMode: 'standard',
+    maxVotesTotal: 4,
+    maxVotesPerCategory: 1,
+    maxVotesPerCandidate: 1,
   },
 ]
 

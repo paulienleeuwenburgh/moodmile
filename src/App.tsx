@@ -4,6 +4,7 @@ import { Leaderboard } from './components/Leaderboard'
 import { QuestionCard } from './components/QuestionCard'
 import { SuggestionBoard } from './components/SuggestionBoard'
 import { SuggestionForm } from './components/SuggestionForm'
+import { VotingRules } from './components/VotingRules'
 import { defaultCampaign, questions } from './data/campaign'
 import type { Suggestion } from './types'
 import { fetchSuggestions, fetchVotedIds, postSuggestion, postVote } from './api'
@@ -125,6 +126,13 @@ function App() {
           />
         ))}
       </section>
+
+      <VotingRules
+        maxVotesTotal={defaultCampaign.maxVotesTotal}
+        maxVotesPerCategory={defaultCampaign.maxVotesPerCategory}
+        maxVotesPerCandidate={defaultCampaign.maxVotesPerCandidate}
+        votesUsed={votedIds.size}
+      />
 
       <SuggestionForm
         questions={questions}

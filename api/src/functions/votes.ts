@@ -1,5 +1,5 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions'
-import { RestError, type TableEntityResult } from '@azure/data-tables'
+import { type TableEntityResult } from '@azure/data-tables'
 import {
   ensureTableExists,
   entityToSuggestion,
@@ -28,10 +28,18 @@ async function getVotes(
   await ensureTableExists(client)
   const votedIds: string[] = []
   const partKey = votePartitionKey(campaignId, sessionId)
-  for await (const entity of client.listEntities({
+
+  // Return unique suggestion IDs (supports both legacy rowKey=suggestionId and
+  // multi-vote rowKey="{suggestionId}|{uuid}" entries via the explicit suggestionId field).
+  const seen = new Set<string>()
+  for await (const entity of client.listEntities<VoteEntity>({
     queryOptions: { filter: `PartitionKey eq '${escapeODataString(partKey)}'` },
   })) {
-    votedIds.push(entity.rowKey as string)
+    const sid = (entity.suggestionId as string | undefined) ?? (entity.rowKey as string)
+    if (sid && !seen.has(sid)) {
+      seen.add(sid)
+      votedIds.push(sid)
+    }
   }
 
   return {
@@ -72,18 +80,16 @@ async function postVote(
   const votePartKey = votePartitionKey(campaignId, sessionId)
   const suggestionPartKey = suggestionPartitionKey(campaignId, questionId)
 
-  // Check current vote state for this suggestion
-  let alreadyVoted = false
-  try {
-    await votesClient.getEntity(votePartKey, suggestionId)
-    alreadyVoted = true
-  } catch (err) {
-    if (err instanceof RestError && err.statusCode === 404) {
-      alreadyVoted = false
-    } else {
-      throw err
-    }
+  // Count how many times this user has already voted for this specific suggestion.
+  let candidateVoteCount = 0
+  for await (const _entity of votesClient.listEntities<VoteEntity>({
+    queryOptions: {
+      filter: `PartitionKey eq '${escapeODataString(votePartKey)}' and suggestionId eq '${escapeODataString(suggestionId)}'`,
+    },
+  })) {
+    candidateVoteCount++
   }
+  const alreadyVoted = candidateVoteCount > 0
 
   // Fetch suggestion entity
   let suggestionEntity: TableEntityResult<SuggestionEntity> | undefined
@@ -115,7 +121,25 @@ async function postVote(
     if (!alreadyVoted) {
       return { status: 409, jsonBody: { error: 'No vote to revoke' } }
     }
-    await votesClient.deleteEntity(votePartKey, suggestionId)
+
+    // Delete one vote entity for this candidate (the first match found).
+    let revokePartKey: string | undefined
+    let revokeRowKey: string | undefined
+    for await (const entity of votesClient.listEntities<VoteEntity>({
+      queryOptions: {
+        filter: `PartitionKey eq '${escapeODataString(votePartKey)}' and suggestionId eq '${escapeODataString(suggestionId)}'`,
+      },
+    })) {
+      revokePartKey = entity.partitionKey as string
+      revokeRowKey = entity.rowKey as string
+      break
+    }
+
+    if (!revokePartKey || !revokeRowKey) {
+      return { status: 409, jsonBody: { error: 'No vote to revoke' } }
+    }
+
+    await votesClient.deleteEntity(revokePartKey, revokeRowKey)
     const newVotes = Math.max(0, currentVotes - 1)
     await suggestionsClient.updateEntity(
       { partitionKey: suggestionPartKey, rowKey: suggestionId, votes: newVotes },
@@ -125,46 +149,68 @@ async function postVote(
     return { status: 200, jsonBody: updated, headers: { 'Content-Type': 'application/json' } }
   }
 
-  // Adding a vote — check campaign rules
-  if (!campaign.allowMultipleVotesPerSuggestion && alreadyVoted) {
-    return { status: 409, jsonBody: { error: 'Already voted for this suggestion' } }
+  // -----------------------------------------------------------------------
+  // Adding a vote — enforce campaign voting rules
+  // -----------------------------------------------------------------------
+
+  // Rule 1: maxVotesPerCandidate — limit votes per suggestion
+  if (campaign.maxVotesPerCandidate > 0 && candidateVoteCount >= campaign.maxVotesPerCandidate) {
+    return {
+      status: 409,
+      jsonBody: { error: `You have already cast the maximum of ${campaign.maxVotesPerCandidate} vote(s) for this candidate` },
+    }
   }
 
-  // Enforce maxVotesPerUser: count all votes cast by this session in this campaign
-  if (campaign.maxVotesPerUser > 0) {
-    let totalVotes = 0
+  // Rule 2: maxVotesPerCategory — limit votes within a question
+  if (campaign.maxVotesPerCategory > 0) {
+    let categoryVoteCount = 0
     for await (const _entity of votesClient.listEntities<VoteEntity>({
-      queryOptions: { filter: `PartitionKey eq '${escapeODataString(votePartKey)}'` },
+      queryOptions: {
+        filter: `PartitionKey eq '${escapeODataString(votePartKey)}' and questionId eq '${escapeODataString(questionId)}'`,
+      },
     })) {
-      totalVotes++
+      categoryVoteCount++
     }
-    if (totalVotes >= campaign.maxVotesPerUser) {
+    if (categoryVoteCount >= campaign.maxVotesPerCategory) {
       return {
         status: 409,
-        jsonBody: { error: `You have reached the maximum of ${campaign.maxVotesPerUser} votes for this campaign` },
+        jsonBody: { error: `You have reached the maximum of ${campaign.maxVotesPerCategory} vote(s) for this category` },
       }
     }
   }
 
-  const createdAt = new Date().toISOString()
-  if (alreadyVoted) {
-    // allowMultipleVotesPerSuggestion = true: store a new vote entry with unique rowKey
-    const voteRowKey = `${suggestionId}|${crypto.randomUUID()}`
-    await votesClient.createEntity({
-      partitionKey: votePartKey,
-      rowKey: voteRowKey,
-      questionId,
-      createdAt,
-    })
-  } else {
-    // Standard: rowKey = suggestionId (one entry per suggestion)
-    await votesClient.createEntity({
-      partitionKey: votePartKey,
-      rowKey: suggestionId,
-      questionId,
-      createdAt,
-    })
+  // Rule 3: maxVotesTotal — limit total votes across the campaign
+  if (campaign.maxVotesTotal > 0) {
+    let totalVoteCount = 0
+    for await (const _entity of votesClient.listEntities<VoteEntity>({
+      queryOptions: { filter: `PartitionKey eq '${escapeODataString(votePartKey)}'` },
+    })) {
+      totalVoteCount++
+    }
+    if (totalVoteCount >= campaign.maxVotesTotal) {
+      return {
+        status: 409,
+        jsonBody: { error: `You have reached the maximum of ${campaign.maxVotesTotal} total vote(s) for this campaign` },
+      }
+    }
   }
+
+  // Persist the vote.
+  // Use rowKey = suggestionId for single-vote-per-candidate campaigns, a unique
+  // key otherwise so multiple votes for the same candidate don't collide.
+  const voteRowKey =
+    campaign.maxVotesPerCandidate === 1
+      ? suggestionId
+      : `${suggestionId}|${crypto.randomUUID()}`
+  const createdAt = new Date().toISOString()
+
+  await votesClient.createEntity({
+    partitionKey: votePartKey,
+    rowKey: voteRowKey,
+    questionId,
+    suggestionId,
+    createdAt,
+  })
 
   const newVotes = currentVotes + 1
   await suggestionsClient.updateEntity(

@@ -7,9 +7,9 @@ export const defaultCampaign: Campaign = {
   status: 'active',
   createdAt: '2024-01-01T00:00:00.000Z',
   allowSuggestions: true,
-  maxVotesPerUser: 4,
-  allowMultipleVotesPerSuggestion: false,
-  votingMode: 'standard',
+  maxVotesTotal: 4,
+  maxVotesPerCategory: 1,
+  maxVotesPerCandidate: 1,
 }
 
 export const questions: Question[] = [

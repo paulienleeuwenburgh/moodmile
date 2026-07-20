@@ -396,3 +396,49 @@ describe('leaderboard', () => {
     expect(document.querySelector('.leaderboard')).not.toBeInTheDocument()
   })
 })
+
+describe('VotingRules', () => {
+  it('shows voting rules on load', async () => {
+    setupApi()
+    render(<App />)
+    await screen.findByRole('button', { name: /add suggestion/i })
+
+    const rules = screen.getByRole('complementary', { name: /voting rules/i })
+    expect(rules).toBeInTheDocument()
+    expect(rules).toHaveTextContent(/one vote per candidate/i)
+    expect(rules).toHaveTextContent(/one vote per category/i)
+    expect(rules).toHaveTextContent(/4 of 4 total votes remaining/i)
+  })
+
+  it('decrements remaining votes after casting a vote', async () => {
+    setupApi([{ ...testSuggestion }])
+    render(<App />)
+    await screen.findAllByRole('button', { name: /vote for rocket/i })
+
+    expect(screen.getByRole('complementary', { name: /voting rules/i })).toHaveTextContent(
+      /4 of 4 total votes remaining/i,
+    )
+
+    await userEvent.click(screen.getAllByRole('button', { name: /vote for rocket/i })[0])
+
+    expect(screen.getByRole('complementary', { name: /voting rules/i })).toHaveTextContent(
+      /3 of 4 total votes remaining/i,
+    )
+  })
+
+  it('increments remaining votes after revoking a vote', async () => {
+    setupApi([{ ...testSuggestion, votes: 1 }], [testSuggestion.id])
+    render(<App />)
+    await screen.findAllByRole('button', { name: /remove vote for rocket/i })
+
+    expect(screen.getByRole('complementary', { name: /voting rules/i })).toHaveTextContent(
+      /3 of 4 total votes remaining/i,
+    )
+
+    await userEvent.click(screen.getAllByRole('button', { name: /remove vote for rocket/i })[0])
+
+    expect(screen.getByRole('complementary', { name: /voting rules/i })).toHaveTextContent(
+      /4 of 4 total votes remaining/i,
+    )
+  })
+})

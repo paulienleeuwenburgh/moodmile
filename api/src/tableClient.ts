@@ -68,8 +68,9 @@ export interface SuggestionEntity {
 
 export interface VoteEntity {
   partitionKey: string // "{campaignId}|{sessionId}"
-  rowKey: string       // suggestionId
+  rowKey: string       // suggestionId, or "{suggestionId}|{uuid}" for multi-votes
   questionId: string
+  suggestionId: string // stored explicitly to support per-candidate queries
   createdAt: string
 }
 
