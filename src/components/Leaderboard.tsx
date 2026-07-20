@@ -5,9 +5,16 @@ interface LeaderboardProps {
   suggestions: Suggestion[]
   votedIds: Set<string>
   onVote: (suggestionId: string) => void | Promise<void>
+  isVoteDisabled?: (suggestionId: string) => boolean
 }
 
-export function Leaderboard({ questions, suggestions, votedIds, onVote }: LeaderboardProps) {
+export function Leaderboard({
+  questions,
+  suggestions,
+  votedIds,
+  onVote,
+  isVoteDisabled,
+}: LeaderboardProps) {
   const ranked = [...suggestions].sort((a, b) => b.votes - a.votes || a.createdAt.localeCompare(b.createdAt))
 
   if (ranked.length === 0) {
@@ -23,6 +30,7 @@ export function Leaderboard({ questions, suggestions, votedIds, onVote }: Leader
         {ranked.map((suggestion, index) => {
           const question = questionById[suggestion.questionId]
           const hasVoted = votedIds.has(suggestion.id)
+          const isDisabled = !hasVoted && Boolean(isVoteDisabled?.(suggestion.id))
           return (
             <li key={suggestion.id} className="leaderboard-entry">
               <span className="leaderboard-entry__rank" aria-label={`Rank ${index + 1}`}>
@@ -44,6 +52,7 @@ export function Leaderboard({ questions, suggestions, votedIds, onVote }: Leader
                 type="button"
                 className={`vote-btn${hasVoted ? ' vote-btn--voted' : ''}`}
                 onClick={() => onVote(suggestion.id)}
+                disabled={isDisabled}
                 aria-pressed={hasVoted}
                 aria-label={hasVoted ? `Remove vote for ${suggestion.name}` : `Vote for ${suggestion.name}`}
               >

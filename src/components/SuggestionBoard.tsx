@@ -5,9 +5,16 @@ interface SuggestionBoardProps {
   suggestions: Suggestion[]
   votedIds: Set<string>
   onVote: (suggestionId: string) => void | Promise<void>
+  isVoteDisabled?: (suggestionId: string) => boolean
 }
 
-export function SuggestionBoard({ questions, suggestions, votedIds, onVote }: SuggestionBoardProps) {
+export function SuggestionBoard({
+  questions,
+  suggestions,
+  votedIds,
+  onVote,
+  isVoteDisabled,
+}: SuggestionBoardProps) {
   return (
     <section className="suggestion-board" aria-label="Suggestions by question">
       <h2>Suggestions by question</h2>
@@ -29,6 +36,7 @@ export function SuggestionBoard({ questions, suggestions, votedIds, onVote }: Su
                 <ul>
                   {questionSuggestions.map((suggestion) => {
                     const hasVoted = votedIds.has(suggestion.id)
+                    const isDisabled = !hasVoted && Boolean(isVoteDisabled?.(suggestion.id))
                     return (
                       <li key={suggestion.id} className="suggestion-card">
                         <span className="suggestion-card__name">{suggestion.name}</span>
@@ -36,6 +44,7 @@ export function SuggestionBoard({ questions, suggestions, votedIds, onVote }: Su
                           type="button"
                           className={`vote-btn${hasVoted ? ' vote-btn--voted' : ''}`}
                           onClick={() => onVote(suggestion.id)}
+                          disabled={isDisabled}
                           aria-pressed={hasVoted}
                           aria-label={hasVoted ? `Remove vote for ${suggestion.name}` : `Vote for ${suggestion.name}`}
                         >

@@ -442,3 +442,86 @@ describe('VotingRules', () => {
     )
   })
 })
+
+describe('vote limit enforcement', () => {
+  it('does not optimistically update when the backend rejects a vote', async () => {
+    mockFetchSuggestions.mockResolvedValue([{ ...testSuggestion }])
+    mockFetchVotedIds.mockResolvedValue(new Set())
+    mockPostSuggestion.mockResolvedValue(null)
+    mockPostVote.mockResolvedValue(null)
+
+    render(<App />)
+    await screen.findAllByRole('button', { name: /vote for rocket/i })
+
+    await userEvent.click(screen.getAllByRole('button', { name: /vote for rocket/i })[0])
+
+    expect(getVoteCount()).toBe(0)
+    expect(screen.getAllByRole('button', { name: /vote for rocket/i })[0]).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /remove vote for rocket/i })).not.toBeInTheDocument()
+  })
+
+  it('keeps frontend and backend aligned when category and total limits are reached', async () => {
+    const limitedSuggestions: Suggestion[] = [
+      { id: 'n1a', campaignId: 'ninja-naming', questionId: 'ninja-1', name: 'Alpha', createdAt: '2024-01-01T00:00:00.000Z', votes: 0 },
+      { id: 'n1b', campaignId: 'ninja-naming', questionId: 'ninja-1', name: 'Bravo', createdAt: '2024-01-02T00:00:00.000Z', votes: 0 },
+      { id: 'n2a', campaignId: 'ninja-naming', questionId: 'ninja-2', name: 'Comet', createdAt: '2024-01-03T00:00:00.000Z', votes: 0 },
+      { id: 'n3a', campaignId: 'ninja-naming', questionId: 'ninja-3', name: 'Delta', createdAt: '2024-01-04T00:00:00.000Z', votes: 0 },
+      { id: 'n4a', campaignId: 'ninja-naming', questionId: 'ninja-4', name: 'Echo', createdAt: '2024-01-05T00:00:00.000Z', votes: 0 },
+    ]
+
+    mockFetchSuggestions.mockResolvedValue(limitedSuggestions)
+    mockFetchVotedIds.mockResolvedValue(new Set())
+    mockPostSuggestion.mockResolvedValue(null)
+
+    const acceptedVotes = new Set<string>()
+    mockPostVote.mockImplementation(async (_campaignId, _questionId, suggestionId) => {
+      const suggestion = limitedSuggestions.find((item) => item.id === suggestionId)
+      if (!suggestion) {
+        return null
+      }
+
+      if (acceptedVotes.has(suggestionId)) {
+        return null
+      }
+
+      const votesInCategory = Array.from(acceptedVotes)
+        .map((id) => limitedSuggestions.find((item) => item.id === id))
+        .filter((item) => item?.questionId === suggestion.questionId)
+      if (votesInCategory.length >= 1) {
+        return null
+      }
+
+      if (acceptedVotes.size >= 4) {
+        return null
+      }
+
+      acceptedVotes.add(suggestionId)
+      suggestion.votes += 1
+      return { ...suggestion }
+    })
+
+    render(<App />)
+    await screen.findAllByRole('button', { name: /vote for alpha/i })
+
+    await userEvent.click(screen.getAllByRole('button', { name: /vote for alpha/i })[0])
+    expect(screen.getByRole('complementary', { name: /voting rules/i })).toHaveTextContent(/3 of 4 total votes remaining/i)
+    expect(screen.getAllByRole('button', { name: /vote for bravo/i })[0]).toBeDisabled()
+
+    await userEvent.click(screen.getAllByRole('button', { name: /vote for comet/i })[0])
+    await userEvent.click(screen.getAllByRole('button', { name: /vote for delta/i })[0])
+    await userEvent.click(screen.getAllByRole('button', { name: /vote for echo/i })[0])
+
+    expect(screen.getByRole('complementary', { name: /voting rules/i })).toHaveTextContent(/0 of 4 total votes remaining/i)
+    expect(screen.getAllByRole('button', { name: /vote for bravo/i })[0]).toBeDisabled()
+
+    await userEvent.click(screen.getAllByRole('button', { name: /vote for bravo/i })[0])
+
+    expect(mockPostVote).toHaveBeenCalledTimes(4)
+    expect(screen.getAllByRole('button', { name: /vote for bravo/i })[0]).toBeDisabled()
+    const boardSection = document.querySelector('.suggestion-board')!
+    const bravoCard = Array.from(boardSection.querySelectorAll('.suggestion-card')).find((card) =>
+      card.textContent?.includes('Bravo'),
+    )
+    expect(bravoCard?.querySelector('.vote-btn__count')?.textContent).toBe('0')
+  })
+})
