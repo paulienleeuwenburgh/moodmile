@@ -2,11 +2,13 @@ import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
-import type { Suggestion } from './types'
+import type { Campaign, Question, Suggestion } from './types'
 
 // ---------------------------------------------------------------------------
 // Mock the API module so tests never make real HTTP calls
 // ---------------------------------------------------------------------------
+const mockFetchCampaign = vi.fn<() => Promise<Campaign>>()
+const mockFetchQuestions = vi.fn<(campaignId: string) => Promise<Question[]>>()
 const mockFetchSuggestions = vi.fn<(campaignId: string) => Promise<Suggestion[]>>()
 const mockFetchVotedIds = vi.fn<(campaignId: string, sessionId: string) => Promise<Set<string>>>()
 const mockPostSuggestion = vi.fn<(campaignId: string, questionId: string, name: string) => Promise<Suggestion | null>>()
@@ -15,12 +17,37 @@ const mockPostVote = vi.fn<
 >()
 
 vi.mock('./api', () => ({
+  fetchCampaign: (...args: Parameters<typeof mockFetchCampaign>) => mockFetchCampaign(...args),
+  fetchQuestions: (...args: Parameters<typeof mockFetchQuestions>) => mockFetchQuestions(...args),
   fetchSuggestions: (...args: Parameters<typeof mockFetchSuggestions>) =>
     mockFetchSuggestions(...args),
   fetchVotedIds: (...args: Parameters<typeof mockFetchVotedIds>) => mockFetchVotedIds(...args),
   postSuggestion: (...args: Parameters<typeof mockPostSuggestion>) => mockPostSuggestion(...args),
   postVote: (...args: Parameters<typeof mockPostVote>) => mockPostVote(...args),
 }))
+
+// ---------------------------------------------------------------------------
+// Default ninja campaign and questions (mirrors the seed data)
+// ---------------------------------------------------------------------------
+
+const ninjaCampaign: Campaign = {
+  id: 'ninja-naming',
+  title: 'These four ninjas need names',
+  description: 'Help us name our four ninja mascots by suggesting and voting for your favorites.',
+  status: 'active',
+  createdAt: '2024-01-01T00:00:00.000Z',
+  allowSuggestions: true,
+  maxVotesTotal: 4,
+  maxVotesPerCategory: 1,
+  maxVotesPerCandidate: 1,
+}
+
+const ninjaQuestions: Question[] = [
+  { id: 'ninja-1', campaignId: 'ninja-naming', title: 'Ninja 1', description: 'This ninja needs a name.', imageUrl: '/mascots/ninja1.png', sortOrder: 1 },
+  { id: 'ninja-2', campaignId: 'ninja-naming', title: 'Ninja 2', description: 'This ninja needs a name.', imageUrl: '/mascots/ninja2.png', sortOrder: 2 },
+  { id: 'ninja-3', campaignId: 'ninja-naming', title: 'Ninja 3', description: 'This ninja needs a name.', imageUrl: '/mascots/ninja3.png', sortOrder: 3 },
+  { id: 'ninja-4', campaignId: 'ninja-naming', title: 'Ninja 4', description: 'This ninja needs a name.', imageUrl: '/mascots/ninja4.png', sortOrder: 4 },
+]
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -38,7 +65,11 @@ const testSuggestion: Suggestion = {
 function setupApi(
   suggestions: Suggestion[] = [],
   votedIds: string[] = [],
+  campaign: Campaign = ninjaCampaign,
+  questions: Question[] = ninjaQuestions,
 ) {
+  mockFetchCampaign.mockResolvedValue(campaign)
+  mockFetchQuestions.mockResolvedValue(questions)
   mockFetchSuggestions.mockResolvedValue(suggestions)
   mockFetchVotedIds.mockResolvedValue(new Set(votedIds))
   mockPostSuggestion.mockImplementation(async (campaignId, questionId, name) => {
@@ -523,5 +554,103 @@ describe('vote limit enforcement', () => {
       card.textContent?.includes('Bravo'),
     )
     expect(bravoCard?.querySelector('.vote-btn__count')?.textContent).toBe('0')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Campaign and questions loaded from storage
+// ---------------------------------------------------------------------------
+
+describe('campaign config loaded from storage', () => {
+  it('renders campaign title and description from the API response', async () => {
+    const customCampaign: Campaign = {
+      ...ninjaCampaign,
+      title: 'Custom Campaign Title',
+      description: 'Custom campaign description.',
+    }
+    setupApi([], [], customCampaign)
+    render(<App />)
+    await screen.findByText('Custom Campaign Title')
+    expect(screen.getByText('Custom campaign description.')).toBeInTheDocument()
+  })
+
+  it('fetches suggestions using the campaign ID returned by the API', async () => {
+    setupApi([{ ...testSuggestion }])
+    render(<App />)
+    await screen.findAllByRole('button', { name: /vote for rocket/i })
+    expect(mockFetchSuggestions).toHaveBeenCalledWith('ninja-naming')
+  })
+
+  it('fetches questions using the campaign ID returned by the API', async () => {
+    setupApi()
+    render(<App />)
+    await screen.findByRole('button', { name: /add suggestion/i })
+    expect(mockFetchQuestions).toHaveBeenCalledWith('ninja-naming')
+  })
+})
+
+describe('questions loaded from storage', () => {
+  it('renders question titles from the API response', async () => {
+    const customQuestions: Question[] = [
+      { id: 'q-1', campaignId: 'ninja-naming', title: 'Custom Ninja A', description: 'desc', sortOrder: 1 },
+      { id: 'q-2', campaignId: 'ninja-naming', title: 'Custom Ninja B', description: 'desc', sortOrder: 2 },
+    ]
+    setupApi([], [], ninjaCampaign, customQuestions)
+    render(<App />)
+    // Title appears in QuestionCard and SuggestionBoard; getAllByText allows multiple matches
+    expect(await screen.findAllByText('Custom Ninja A')).not.toHaveLength(0)
+    expect(screen.getAllByText('Custom Ninja B')).not.toHaveLength(0)
+  })
+
+  it('shows custom question in the suggestion form dropdown', async () => {
+    const customQuestions: Question[] = [
+      { id: 'q-special', campaignId: 'ninja-naming', title: 'The Special Ninja', description: 'desc', sortOrder: 1 },
+    ]
+    setupApi([], [], ninjaCampaign, customQuestions)
+    render(<App />)
+    // Wait until questions are loaded and the combobox shows the custom question
+    const select = screen.getByRole('combobox', { name: /question/i })
+    await screen.findAllByText('The Special Ninja')
+    expect(select).toHaveTextContent('The Special Ninja')
+  })
+})
+
+describe('suggestions and vote rules after campaign loaded from storage', () => {
+  it('existing suggestions still work after loading campaign from storage', async () => {
+    const existingSuggestion: Suggestion = {
+      id: 'stored-sug',
+      campaignId: 'ninja-naming',
+      questionId: 'ninja-1',
+      name: 'StoredName',
+      createdAt: '2024-01-01T00:00:00.000Z',
+      votes: 3,
+    }
+    setupApi([existingSuggestion])
+    render(<App />)
+    await screen.findAllByRole('button', { name: /vote for storedname/i })
+    expect(screen.getAllByText('StoredName')[0]).toBeInTheDocument()
+  })
+
+  it('existing vote rules still work after loading campaign from storage', async () => {
+    const suggestion: Suggestion = {
+      id: 'rule-sug',
+      campaignId: 'ninja-naming',
+      questionId: 'ninja-1',
+      name: 'RuleTest',
+      createdAt: '2024-01-01T00:00:00.000Z',
+      votes: 0,
+    }
+    // Campaign with maxVotesTotal = 1
+    const limitedCampaign: Campaign = { ...ninjaCampaign, maxVotesTotal: 1 }
+    setupApi([suggestion], [], limitedCampaign)
+    render(<App />)
+    await screen.findAllByRole('button', { name: /vote for ruletest/i })
+
+    await userEvent.click(screen.getAllByRole('button', { name: /vote for ruletest/i })[0])
+
+    // Total limit reached — VotingRules shows 0 remaining (singular when max=1)
+    expect(screen.getByRole('complementary', { name: /voting rules/i })).toHaveTextContent(
+      /0 of 1 total vote remaining/i,
+    )
   })
 })

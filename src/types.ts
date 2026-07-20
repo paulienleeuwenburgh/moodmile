@@ -4,6 +4,7 @@ export interface Campaign {
   description: string
   status: string
   createdAt: string
+  updatedAt?: string
   allowSuggestions: boolean
   /** Maximum votes a user may cast across the entire campaign. 0 = unlimited. */
   maxVotesTotal: number
@@ -20,6 +21,8 @@ export interface Question {
   description: string
   imageUrl?: string
   sortOrder: number
+  createdAt?: string
+  updatedAt?: string
 }
 
 export interface Suggestion {
