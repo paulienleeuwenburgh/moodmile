@@ -115,17 +115,20 @@ function App({ campaignId }: AppProps) {
 
   const handleVote = async (suggestionId: string) => {
     if (!campaign) return
+    // Capture the non-null campaign value so TypeScript (and async closures) stay safe
+    // even if the state theoretically changes between the null check and the await below.
+    const currentCampaign = campaign
     const revoke = votedIds.has(suggestionId)
     const sessionId = getSessionId()
     const suggestion = suggestions.find((s) => s.id === suggestionId)
     if (!suggestion) return
 
-    if (!revoke && !canCastVote(campaign, voteRecords, suggestion.questionId, suggestion.id)) {
+    if (!revoke && !canCastVote(currentCampaign, voteRecords, suggestion.questionId, suggestion.id)) {
       return
     }
 
     const updated = await postVote(
-      campaign.id,
+      currentCampaign.id,
       suggestion.questionId,
       suggestionId,
       sessionId,

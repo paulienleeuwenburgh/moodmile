@@ -139,7 +139,9 @@ Tracks which suggestions each browser session has voted for.
 
 ## Default ninja campaign seeding
 
-On the first request to `GET /api/campaign?campaignId=ninja-naming`, the backend checks whether the `ninja-naming` campaign exists in the `campaigns` table. If it does not, it seeds:
+On every request to `GET /api/campaign?campaignId=X`, the backend calls `seedDefaultCampaign()` which checks whether the `ninja-naming` campaign exists and creates it if it does not. This ensures the default campaign is always available regardless of which campaign URL is requested first. The seed function is idempotent (uses `upsertEntity` with Replace mode), so concurrent cold-starts are safe.
+
+The default campaign seeded is:
 
 **Campaign:**
 - `campaignId`: `ninja-naming`
@@ -148,8 +150,6 @@ On the first request to `GET /api/campaign?campaignId=ninja-naming`, the backend
 - `maxVotesTotal`: 4, `maxVotesPerCategory`: 1, `maxVotesPerCandidate`: 1
 
 **Questions:** Ninja 1–4, each with an image from `/public/mascots/ninja{1-4}.png`
-
-Seeding uses `upsertEntity` (Replace mode) so concurrent cold-starts are safe.
 
 ## Creating a new campaign
 
