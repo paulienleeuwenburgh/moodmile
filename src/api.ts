@@ -11,8 +11,8 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>
 }
 
-export async function fetchCampaign(): Promise<Campaign> {
-  return apiFetch<Campaign>('/campaign')
+export async function fetchCampaign(campaignId: string): Promise<Campaign> {
+  return apiFetch<Campaign>(`/campaign?campaignId=${encodeURIComponent(campaignId)}`)
 }
 
 export async function fetchQuestions(campaignId: string): Promise<Question[]> {
@@ -43,14 +43,14 @@ export async function postSuggestion(
   }
 }
 
-export async function fetchVotedIds(
+export async function fetchVoteCounts(
   campaignId: string,
   sessionId: string,
-): Promise<Set<string>> {
-  const ids = await apiFetch<string[]>(
+): Promise<Map<string, number>> {
+  const counts = await apiFetch<Record<string, number>>(
     `/votes?campaignId=${encodeURIComponent(campaignId)}&sessionId=${encodeURIComponent(sessionId)}`,
   )
-  return new Set(ids)
+  return new Map(Object.entries(counts))
 }
 
 export async function postVote(

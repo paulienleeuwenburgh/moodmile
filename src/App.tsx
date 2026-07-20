@@ -1,52 +1,76 @@
-import { useEffect, useState } from 'react'
+import { useMemo, useEffect, useState } from 'react'
 import './App.css'
 import { Leaderboard } from './components/Leaderboard'
 import { QuestionCard } from './components/QuestionCard'
 import { SuggestionBoard } from './components/SuggestionBoard'
 import { SuggestionForm } from './components/SuggestionForm'
 import { VotingRules } from './components/VotingRules'
-import { defaultCampaign, questions as defaultQuestions } from './data/campaign'
 import type { Campaign, Question, Suggestion } from './types'
-import { fetchCampaign, fetchQuestions, fetchSuggestions, fetchVotedIds, postSuggestion, postVote } from './api'
+import { fetchCampaign, fetchQuestions, fetchSuggestions, fetchVoteCounts, postSuggestion, postVote } from './api'
 import { getSessionId } from './utils/sessionId'
 import { canCastVote, getClientVoteRecords } from './utils/voteLimits'
 
-function App() {
-  const [campaign, setCampaign] = useState<Campaign>(defaultCampaign)
-  const [questions, setQuestions] = useState<Question[]>(defaultQuestions)
-  const [selectedQuestionId, setSelectedQuestionId] = useState(defaultQuestions[0]?.id ?? '')
+interface AppProps {
+  campaignId: string
+}
+
+function App({ campaignId }: AppProps) {
+  const [campaign, setCampaign] = useState<Campaign | null>(null)
+  const [campaignNotFound, setCampaignNotFound] = useState(false)
+  const [questions, setQuestions] = useState<Question[]>([])
+  const [selectedQuestionId, setSelectedQuestionId] = useState('')
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
-  const [votedIds, setVotedIds] = useState<Set<string>>(new Set())
-  const voteRecords = getClientVoteRecords(suggestions, votedIds)
+  const [voteCountById, setVoteCountById] = useState<Map<string, number>>(new Map())
+
+  // Derive votedIds: a suggestion is "voted" (shows remove-vote button) when the user
+  // has reached the per-candidate limit, or when maxVotesPerCandidate is unlimited and
+  // they have cast at least one vote.
+  const votedIds = useMemo(() => {
+    const set = new Set<string>()
+    for (const [id, count] of voteCountById) {
+      const atLimit =
+        (campaign?.maxVotesPerCandidate ?? 0) > 0
+          ? count >= (campaign?.maxVotesPerCandidate ?? 1)
+          : count > 0
+      if (atLimit) set.add(id)
+    }
+    return set
+  }, [voteCountById, campaign?.maxVotesPerCandidate])
+
+  const voteRecords = getClientVoteRecords(suggestions, voteCountById)
 
   useEffect(() => {
     const sessionId = getSessionId()
-    fetchCampaign()
-      .then((loadedCampaign) => {
-        const id = loadedCampaign.id
-        return Promise.all([
+    fetchCampaign(campaignId)
+      .then((loadedCampaign) =>
+        Promise.all([
           Promise.resolve(loadedCampaign),
-          fetchQuestions(id),
-          fetchSuggestions(id),
-          fetchVotedIds(id, sessionId),
-        ])
-      })
-      .then(([loadedCampaign, loadedQuestions, loadedSuggestions, loadedVotedIds]) => {
+          fetchQuestions(campaignId),
+          fetchSuggestions(campaignId),
+          fetchVoteCounts(campaignId, sessionId),
+        ]),
+      )
+      .then(([loadedCampaign, loadedQuestions, loadedSuggestions, loadedVoteCounts]) => {
         setCampaign(loadedCampaign)
         setQuestions(loadedQuestions)
         if (loadedQuestions.length > 0) {
           setSelectedQuestionId(loadedQuestions[0].id)
         }
         setSuggestions(loadedSuggestions)
-        setVotedIds(loadedVotedIds)
+        setVoteCountById(loadedVoteCounts)
       })
-      .catch(() => {
-        // Data load failed — the app remains functional with empty state
+      .catch((err: unknown) => {
+        const isNotFound =
+          err instanceof Error && err.message.includes('Campaign not found')
+        if (isNotFound) {
+          setCampaignNotFound(true)
+        }
+        // Other errors: app stays in loading state with empty data
       })
-  }, [])
+  }, [campaignId])
 
   const handleSuggestionSubmit = (name: string) => {
-    if (!selectedQuestionId) {
+    if (!selectedQuestionId || !campaign) {
       return
     }
 
@@ -90,12 +114,13 @@ function App() {
   }
 
   const handleVote = async (suggestionId: string) => {
-    const hasVoted = votedIds.has(suggestionId)
+    if (!campaign) return
+    const revoke = votedIds.has(suggestionId)
     const sessionId = getSessionId()
     const suggestion = suggestions.find((s) => s.id === suggestionId)
     if (!suggestion) return
 
-    if (!hasVoted && !canCastVote(campaign, voteRecords, suggestion.questionId, suggestion.id)) {
+    if (!revoke && !canCastVote(campaign, voteRecords, suggestion.questionId, suggestion.id)) {
       return
     }
 
@@ -104,7 +129,7 @@ function App() {
       suggestion.questionId,
       suggestionId,
       sessionId,
-      hasVoted,
+      revoke,
     )
 
     if (!updated) {
@@ -118,18 +143,24 @@ function App() {
       }),
     )
 
-    setVotedIds((current) => {
-      const next = new Set(current)
-      if (hasVoted) {
-        next.delete(suggestionId)
+    setVoteCountById((current) => {
+      const next = new Map(current)
+      if (revoke) {
+        const newCount = Math.max(0, (next.get(suggestionId) ?? 0) - 1)
+        if (newCount === 0) {
+          next.delete(suggestionId)
+        } else {
+          next.set(suggestionId, newCount)
+        }
       } else {
-        next.add(suggestionId)
+        next.set(suggestionId, (next.get(suggestionId) ?? 0) + 1)
       }
       return next
     })
   }
 
   const isVoteDisabled = (suggestionId: string) => {
+    if (!campaign) return false
     const suggestion = suggestions.find((item) => item.id === suggestionId)
     if (!suggestion) {
       return false
@@ -137,6 +168,22 @@ function App() {
 
     return !votedIds.has(suggestionId)
       && !canCastVote(campaign, voteRecords, suggestion.questionId, suggestion.id)
+  }
+
+  if (campaignNotFound) {
+    return (
+      <main className="app-shell">
+        <section className="hero">
+          <p className="hero__eyebrow">MOODMILE</p>
+          <h1>Campaign not found</h1>
+          <p>The campaign you are looking for does not exist or is no longer available.</p>
+        </section>
+      </main>
+    )
+  }
+
+  if (!campaign) {
+    return null
   }
 
   return (

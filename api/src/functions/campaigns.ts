@@ -11,35 +11,43 @@ import {
 import { seedDefaultCampaign } from '../seed'
 
 /**
- * GET /api/campaign
+ * GET /api/campaign?campaignId=X
  *
- * Returns the first active campaign from Azure Table Storage.
- * Seeds the default ninja-naming campaign on first request if no active campaign exists.
+ * Returns the campaign with the given campaignId from Azure Table Storage.
+ * Seeds the default ninja-naming campaign on first request if it does not exist yet.
+ * Returns 404 if the requested campaign is not found.
  */
 async function getCampaign(
-  _request: HttpRequest,
+  request: HttpRequest,
   _context: InvocationContext,
 ): Promise<HttpResponseInit> {
+  const campaignId = request.query.get('campaignId')
+  if (!campaignId) {
+    return { status: 400, jsonBody: { error: 'campaignId query parameter is required' } }
+  }
+
+  // Seed the default campaign on first request so the ninja campaign always exists.
+  await seedDefaultCampaign()
+
   const client = getCampaignsClient()
   await ensureTableExists(client)
 
-  for await (const entity of client.listEntities<CampaignEntity>({
-    queryOptions: { filter: "PartitionKey eq 'campaign' and status eq 'active'" },
-  })) {
+  try {
+    const entity = await client.getEntity<CampaignEntity>('campaign', campaignId)
     return {
       status: 200,
       jsonBody: entityToCampaignConfig(entity),
       headers: { 'Content-Type': 'application/json' },
     }
-  }
-
-  // No active campaign found — seed the default and return it.
-  await seedDefaultCampaign()
-  const seeded = await client.getEntity<CampaignEntity>('campaign', 'ninja-naming')
-  return {
-    status: 200,
-    jsonBody: entityToCampaignConfig(seeded),
-    headers: { 'Content-Type': 'application/json' },
+  } catch (err) {
+    const isNotFound =
+      err instanceof Error &&
+      'statusCode' in err &&
+      (err as { statusCode: number }).statusCode === 404
+    if (isNotFound) {
+      return { status: 404, jsonBody: { error: 'Campaign not found' } }
+    }
+    throw err
   }
 }
 

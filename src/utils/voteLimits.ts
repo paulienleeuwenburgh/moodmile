@@ -7,14 +7,16 @@ interface VoteRecord {
 
 export function getClientVoteRecords(
   suggestions: Suggestion[],
-  votedIds: Set<string>,
+  voteCountById: Map<string, number>,
 ): VoteRecord[] {
-  return suggestions
-    .filter((suggestion) => votedIds.has(suggestion.id))
-    .map((suggestion) => ({
-      questionId: suggestion.questionId,
-      suggestionId: suggestion.id,
-    }))
+  const records: VoteRecord[] = []
+  for (const suggestion of suggestions) {
+    const count = voteCountById.get(suggestion.id) ?? 0
+    for (let i = 0; i < count; i++) {
+      records.push({ questionId: suggestion.questionId, suggestionId: suggestion.id })
+    }
+  }
+  return records
 }
 
 export function canCastVote(
