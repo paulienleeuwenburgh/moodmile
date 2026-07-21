@@ -1,4 +1,6 @@
-import { TableClient, AzureNamedKeyCredential, TableEntityResult } from '@azure/data-tables'
+import { TableClient, AzureNamedKeyCredential, TableEntityResult, RestError } from '@azure/data-tables'
+
+const ensuredTables = new Set<string>()
 
 function getTableClient(tableName: string): TableClient {
   const connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING
@@ -22,17 +24,129 @@ function getTableClient(tableName: string): TableClient {
   )
 }
 
-export interface SuggestionEntity {
+export async function ensureTableExists(client: TableClient): Promise<void> {
+  if (ensuredTables.has(client.tableName)) {
+    return
+  }
+
+  try {
+    await client.createTable()
+  } catch (err) {
+    if (!(err instanceof RestError) || err.statusCode !== 409) {
+      throw err
+    }
+  }
+
+  ensuredTables.add(client.tableName)
+}
+
+/**
+ * Partition key for a suggestion row.
+ * Format: "{campaignId}|{questionId}"
+ */
+export function suggestionPartitionKey(campaignId: string, questionId: string): string {
+  return `${campaignId}|${questionId}`
+}
+
+/**
+ * Partition key for a vote row.
+ * Format: "{campaignId}|{sessionId}"
+ */
+export function votePartitionKey(campaignId: string, sessionId: string): string {
+  return `${campaignId}|${sessionId}`
+}
+
+// ─── Campaign entities ────────────────────────────────────────────────────────
+
+/**
+ * Campaign row in the 'campaigns' table.
+ * partitionKey = 'campaign'  (constant – groups all campaigns in one partition)
+ * rowKey       = campaignId  (e.g. 'ninja-naming')
+ */
+export interface CampaignEntity {
   partitionKey: string
-  rowKey: string
+  rowKey: string       // campaignId
+  title: string
+  description: string
+  status: string       // e.g. 'active' | 'closed'
+  allowSuggestions: boolean
+  maxVotesTotal: number
+  maxVotesPerCategory: number
+  maxVotesPerCandidate: number
+  createdAt: string
+  updatedAt: string
+}
+
+/**
+ * Question row in the 'questions' table.
+ * partitionKey = campaignId  (e.g. 'ninja-naming')
+ * rowKey       = questionId  (e.g. 'ninja-1')
+ */
+export interface QuestionEntity {
+  partitionKey: string // campaignId
+  rowKey: string       // questionId
+  title: string
+  description: string
+  imageUrl?: string
+  sortOrder: number
+  createdAt: string
+  updatedAt: string
+}
+
+export function getCampaignsClient(): TableClient {
+  return getTableClient('campaigns')
+}
+
+export function getQuestionsClient(): TableClient {
+  return getTableClient('questions')
+}
+
+export function entityToCampaignConfig(entity: TableEntityResult<CampaignEntity>) {
+  return {
+    id: entity.rowKey as string,
+    title: entity.title,
+    description: entity.description,
+    status: entity.status,
+    allowSuggestions: entity.allowSuggestions,
+    maxVotesTotal: entity.maxVotesTotal,
+    maxVotesPerCategory: entity.maxVotesPerCategory,
+    maxVotesPerCandidate: entity.maxVotesPerCandidate,
+    createdAt: entity.createdAt,
+    updatedAt: entity.updatedAt,
+  }
+}
+
+export function entityToQuestion(entity: TableEntityResult<QuestionEntity>) {
+  return {
+    id: entity.rowKey as string,
+    campaignId: entity.partitionKey as string,
+    title: entity.title,
+    description: entity.description,
+    imageUrl: entity.imageUrl,
+    sortOrder: entity.sortOrder,
+    createdAt: entity.createdAt,
+    updatedAt: entity.updatedAt,
+  }
+}
+
+// ─── Suggestion / Vote entities ───────────────────────────────────────────────
+
+export interface SuggestionEntity {
+  partitionKey: string // "{campaignId}|{questionId}"
+  rowKey: string       // suggestionId
+  campaignId: string
+  questionId: string
   name: string
   createdAt: string
   votes: number
 }
 
 export interface VoteEntity {
-  partitionKey: string
-  rowKey: string
+  partitionKey: string // "{campaignId}|{sessionId}"
+  rowKey: string       // suggestionId, or "{suggestionId}|{uuid}" for multi-votes
+  questionId: string
+  suggestionId: string // stored explicitly to support per-candidate queries
+  createdAt: string
 }
 
 export function getSuggestionsClient(): TableClient {
@@ -44,9 +158,14 @@ export function getVotesClient(): TableClient {
 }
 
 export function entityToSuggestion(entity: TableEntityResult<SuggestionEntity>) {
+  // partitionKey is always in the format "{campaignId}|{questionId}" for entities
+  // created by this application. The campaignId and questionId properties are stored
+  // explicitly on the entity, with the split used only as a fallback for older rows.
+  const [fallbackCampaignId, fallbackQuestionId] = entity.partitionKey.split('|')
   return {
     id: entity.rowKey,
-    mascotId: entity.partitionKey,
+    campaignId: entity.campaignId ?? fallbackCampaignId ?? '',
+    questionId: entity.questionId ?? fallbackQuestionId ?? '',
     name: entity.name,
     createdAt: entity.createdAt,
     votes: entity.votes ?? 0,

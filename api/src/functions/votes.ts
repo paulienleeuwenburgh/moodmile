@@ -1,28 +1,73 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions'
-import { RestError, type TableEntityResult } from '@azure/data-tables'
-import { entityToSuggestion, getSuggestionsClient, getVotesClient, SuggestionEntity } from '../tableClient'
+import { type TableEntityResult } from '@azure/data-tables'
+import {
+  ensureTableExists,
+  entityToSuggestion,
+  getSuggestionsClient,
+  getVotesClient,
+  SuggestionEntity,
+  VoteEntity,
+  suggestionPartitionKey,
+  votePartitionKey,
+} from '../tableClient'
 import { escapeODataString } from '../odata'
+import { getCampaign } from '../campaigns'
+import { canCastVote, type VoteRecord } from '../voteLimits'
+
+interface StoredVoteRecord extends VoteRecord {
+  partitionKey: string
+  rowKey: string
+}
+
+function getSuggestionId(entity: VoteEntity): string {
+  return (entity.suggestionId as string | undefined) ?? String(entity.rowKey).split('|')[0] ?? ''
+}
+
+async function listVoteRecords(campaignId: string, sessionId: string): Promise<StoredVoteRecord[]> {
+  const client = getVotesClient()
+  const partKey = votePartitionKey(campaignId, sessionId)
+  const records: StoredVoteRecord[] = []
+
+  for await (const entity of client.listEntities<VoteEntity>({
+    queryOptions: { filter: `PartitionKey eq '${escapeODataString(partKey)}'` },
+  })) {
+    records.push({
+      partitionKey: entity.partitionKey as string,
+      rowKey: entity.rowKey as string,
+      questionId: String(entity.questionId ?? ''),
+      suggestionId: getSuggestionId(entity),
+    })
+  }
+
+  return records
+}
 
 async function getVotes(
   request: HttpRequest,
   _context: InvocationContext,
 ): Promise<HttpResponseInit> {
   const sessionId = request.query.get('sessionId')
-  if (!sessionId) {
-    return { status: 400, jsonBody: { error: 'sessionId query parameter is required' } }
+  const campaignId = request.query.get('campaignId')
+
+  if (!sessionId || !campaignId) {
+    return { status: 400, jsonBody: { error: 'campaignId and sessionId query parameters are required' } }
   }
 
   const client = getVotesClient()
-  const votedIds: string[] = []
-  for await (const entity of client.listEntities({
-    queryOptions: { filter: `PartitionKey eq '${escapeODataString(sessionId)}'` },
-  })) {
-    votedIds.push(entity.rowKey as string)
+  await ensureTableExists(client)
+  const voteRecords = await listVoteRecords(campaignId, sessionId)
+
+  // Return vote counts per suggestion: { [suggestionId]: count }
+  const counts: Record<string, number> = {}
+  for (const vote of voteRecords) {
+    if (vote.suggestionId) {
+      counts[vote.suggestionId] = (counts[vote.suggestionId] ?? 0) + 1
+    }
   }
 
   return {
     status: 200,
-    jsonBody: votedIds,
+    jsonBody: counts,
     headers: { 'Content-Type': 'application/json' },
   }
 }
@@ -31,40 +76,47 @@ async function postVote(
   request: HttpRequest,
   _context: InvocationContext,
 ): Promise<HttpResponseInit> {
-  const body = (await request.json()) as { sessionId?: string; suggestionId?: string; revoke?: boolean }
-  const { sessionId, suggestionId, revoke } = body
+  const body = (await request.json()) as {
+    campaignId?: string
+    questionId?: string
+    sessionId?: string
+    suggestionId?: string
+    revoke?: boolean
+  }
+  const { campaignId, questionId, sessionId, suggestionId, revoke } = body
 
-  if (!sessionId || !suggestionId) {
-    return { status: 400, jsonBody: { error: 'sessionId and suggestionId are required' } }
+  if (!campaignId || !questionId || !sessionId || !suggestionId) {
+    return {
+      status: 400,
+      jsonBody: { error: 'campaignId, questionId, sessionId and suggestionId are required' },
+    }
+  }
+
+  const campaign = await getCampaign(campaignId)
+  if (!campaign) {
+    return { status: 404, jsonBody: { error: 'Campaign not found' } }
   }
 
   const votesClient = getVotesClient()
   const suggestionsClient = getSuggestionsClient()
+  await Promise.all([ensureTableExists(votesClient), ensureTableExists(suggestionsClient)])
+  const votePartKey = votePartitionKey(campaignId, sessionId)
+  const suggestionPartKey = suggestionPartitionKey(campaignId, questionId)
 
-  // Check current vote state
-  let alreadyVoted = false
-  try {
-    await votesClient.getEntity(sessionId, suggestionId)
-    alreadyVoted = true
-  } catch (err) {
-    if (err instanceof RestError && err.statusCode === 404) {
-      alreadyVoted = false
-    } else {
-      throw err
-    }
-  }
+  const voteRecords = await listVoteRecords(campaignId, sessionId)
+  const existingVote = voteRecords.find((vote) => vote.suggestionId === suggestionId)
+  const alreadyVoted = Boolean(existingVote)
 
-  // Fetch suggestion to update its vote count
-  // rowKey is suggestionId, partitionKey is mascotId — query by RowKey across all partitions
+  // Fetch suggestion entity
   let suggestionEntity: TableEntityResult<SuggestionEntity> | undefined
-  let mascotId: string | undefined
   try {
     let found = false
     for await (const entity of suggestionsClient.listEntities<SuggestionEntity>({
-      queryOptions: { filter: `RowKey eq '${escapeODataString(suggestionId)}'` },
+      queryOptions: {
+        filter: `PartitionKey eq '${escapeODataString(suggestionPartKey)}' and RowKey eq '${escapeODataString(suggestionId)}'`,
+      },
     })) {
       suggestionEntity = entity
-      mascotId = entity.partitionKey as string
       found = true
       break
     }
@@ -75,7 +127,7 @@ async function postVote(
     return { status: 404, jsonBody: { error: 'Suggestion not found' } }
   }
 
-  if (!suggestionEntity || !mascotId) {
+  if (!suggestionEntity) {
     return { status: 404, jsonBody: { error: 'Suggestion not found' } }
   }
 
@@ -85,29 +137,53 @@ async function postVote(
     if (!alreadyVoted) {
       return { status: 409, jsonBody: { error: 'No vote to revoke' } }
     }
-    // Remove vote record and decrement
-    await votesClient.deleteEntity(sessionId, suggestionId)
+
+    if (!existingVote) {
+      return { status: 409, jsonBody: { error: 'No vote to revoke' } }
+    }
+
+    await votesClient.deleteEntity(existingVote.partitionKey, existingVote.rowKey)
     const newVotes = Math.max(0, currentVotes - 1)
     await suggestionsClient.updateEntity(
-      { partitionKey: mascotId, rowKey: suggestionId, votes: newVotes },
-      'Merge',
-    )
-    const updated = { ...entityToSuggestion(suggestionEntity), votes: newVotes }
-    return { status: 200, jsonBody: updated, headers: { 'Content-Type': 'application/json' } }
-  } else {
-    if (alreadyVoted) {
-      return { status: 409, jsonBody: { error: 'Already voted for this suggestion' } }
-    }
-    // Add vote record and increment
-    await votesClient.createEntity({ partitionKey: sessionId, rowKey: suggestionId })
-    const newVotes = currentVotes + 1
-    await suggestionsClient.updateEntity(
-      { partitionKey: mascotId, rowKey: suggestionId, votes: newVotes },
+      { partitionKey: suggestionPartKey, rowKey: suggestionId, votes: newVotes },
       'Merge',
     )
     const updated = { ...entityToSuggestion(suggestionEntity), votes: newVotes }
     return { status: 200, jsonBody: updated, headers: { 'Content-Type': 'application/json' } }
   }
+
+  const voteCheck = canCastVote(campaign, voteRecords, questionId, suggestionId)
+  if (!voteCheck.allowed) {
+    return {
+      status: 409,
+      jsonBody: { error: voteCheck.error },
+    }
+  }
+
+  // Persist the vote.
+  // Use rowKey = suggestionId for single-vote-per-candidate campaigns, a unique
+  // key otherwise so multiple votes for the same candidate don't collide.
+  const voteRowKey =
+    campaign.maxVotesPerCandidate === 1
+      ? suggestionId
+      : `${suggestionId}|${crypto.randomUUID()}`
+  const createdAt = new Date().toISOString()
+
+  await votesClient.createEntity({
+    partitionKey: votePartKey,
+    rowKey: voteRowKey,
+    questionId,
+    suggestionId,
+    createdAt,
+  })
+
+  const newVotes = currentVotes + 1
+  await suggestionsClient.updateEntity(
+    { partitionKey: suggestionPartKey, rowKey: suggestionId, votes: newVotes },
+    'Merge',
+  )
+  const updated = { ...entityToSuggestion(suggestionEntity), votes: newVotes }
+  return { status: 200, jsonBody: updated, headers: { 'Content-Type': 'application/json' } }
 }
 
 app.http('getVotes', {
