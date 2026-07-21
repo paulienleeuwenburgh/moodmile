@@ -325,6 +325,13 @@
   white-space: nowrap;
 }
 
+.vote-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
 /* ── Vote button ─────────────────────────────────────────────────────────── */
 .vote-btn {
   display: flex;
@@ -495,4 +502,3 @@
     height: 100px;
   }
 }
-

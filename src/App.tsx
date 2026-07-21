@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import './App.css'
 import { Leaderboard } from './components/Leaderboard'
 import { QuestionCard } from './components/QuestionCard'
@@ -21,21 +21,6 @@ function App({ campaignId }: AppProps) {
   const [selectedQuestionId, setSelectedQuestionId] = useState('')
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const [voteCountById, setVoteCountById] = useState<Map<string, number>>(new Map())
-
-  // Derive votedIds: a suggestion is "voted" (shows remove-vote button) when the user
-  // has reached the per-candidate limit, or when maxVotesPerCandidate is unlimited and
-  // they have cast at least one vote.
-  const votedIds = useMemo(() => {
-    const set = new Set<string>()
-    for (const [id, count] of voteCountById) {
-      const atLimit =
-        (campaign?.maxVotesPerCandidate ?? 0) > 0
-          ? count >= (campaign?.maxVotesPerCandidate ?? 1)
-          : count > 0
-      if (atLimit) set.add(id)
-    }
-    return set
-  }, [voteCountById, campaign?.maxVotesPerCandidate])
 
   const voteRecords = getClientVoteRecords(suggestions, voteCountById)
 
@@ -113,12 +98,9 @@ function App({ campaignId }: AppProps) {
       })
   }
 
-  const handleVote = async (suggestionId: string) => {
+  const handleVote = async (suggestionId: string, revoke: boolean) => {
     if (!campaign) return
-    // Capture the non-null campaign value so TypeScript (and async closures) stay safe
-    // even if the state theoretically changes between the null check and the await below.
     const currentCampaign = campaign
-    const revoke = votedIds.has(suggestionId)
     const sessionId = getSessionId()
     const suggestion = suggestions.find((s) => s.id === suggestionId)
     if (!suggestion) return
@@ -169,8 +151,7 @@ function App({ campaignId }: AppProps) {
       return false
     }
 
-    return !votedIds.has(suggestionId)
-      && !canCastVote(campaign, voteRecords, suggestion.questionId, suggestion.id)
+    return !canCastVote(campaign, voteRecords, suggestion.questionId, suggestion.id)
   }
 
   if (campaignNotFound) {
@@ -225,17 +206,19 @@ function App({ campaignId }: AppProps) {
       />
 
       <SuggestionBoard
+        campaign={campaign}
         questions={questions}
         suggestions={suggestions}
-        votedIds={votedIds}
+        voteCountById={voteCountById}
         onVote={handleVote}
         isVoteDisabled={isVoteDisabled}
       />
 
       <Leaderboard
+        campaign={campaign}
         questions={questions}
         suggestions={suggestions}
-        votedIds={votedIds}
+        voteCountById={voteCountById}
         onVote={handleVote}
         isVoteDisabled={isVoteDisabled}
       />
