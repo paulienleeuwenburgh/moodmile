@@ -150,6 +150,9 @@ function App({ campaignId }: AppProps) {
     if (!suggestion) {
       return false
     }
+    if (campaign.maxVotesPerCandidate === 1 && (voteCountById.get(suggestionId) ?? 0) > 0) {
+      return false
+    }
 
     return !canCastVote(campaign, voteRecords, suggestion.questionId, suggestion.id)
   }
