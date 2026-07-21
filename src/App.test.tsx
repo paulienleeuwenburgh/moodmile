@@ -781,12 +781,12 @@ describe('maxVotesPerCandidate', () => {
     expect(mockPostVote).toHaveBeenLastCalledWith('best-padeller-2026', 'nominees', 'alice', expect.any(String), false)
 
     await screen.findAllByRole('button', { name: /vote for alice/i })
-    expect(screen.getAllByRole('button', { name: /remove vote for alice/i })[0]).toBeInTheDocument()
+    screen.getAllByRole('button', { name: /remove vote for alice/i })
 
     await userEvent.click(screen.getAllByRole('button', { name: /vote for alice/i })[0])
     expect(mockPostVote).toHaveBeenCalledTimes(2)
     expect(mockPostVote).toHaveBeenLastCalledWith('best-padeller-2026', 'nominees', 'alice', expect.any(String), false)
-    expect(screen.getAllByRole('button', { name: /remove vote for alice/i })[0]).toBeInTheDocument()
+    screen.getAllByRole('button', { name: /remove vote for alice/i })
   })
 
   it('rejects the third vote on the same suggestion when maxVotesPerCandidate=2', async () => {
@@ -800,7 +800,6 @@ describe('maxVotesPerCandidate', () => {
     await screen.findAllByRole('button', { name: /remove vote for alice/i })
     const voteButtons = screen.getAllByRole('button', { name: /^vote for alice$/i })
     expect(voteButtons[0]).toBeDisabled()
-    expect(screen.getAllByRole('button', { name: /remove vote for alice/i })[0]).toBeInTheDocument()
   })
 
   it('maxVotesTotal still blocks votes beyond the campaign total', async () => {
@@ -818,7 +817,6 @@ describe('maxVotesPerCandidate', () => {
     await screen.findAllByRole('button', { name: /remove vote for alice/i })
 
     // alice is at candidate limit → remove button
-    expect(screen.getAllByRole('button', { name: /remove vote for alice/i })[0]).toBeInTheDocument()
     // bob has 1 vote (not at candidate limit of 2), but total is exhausted → vote button is disabled (not remove)
     const bobVoteButtons = screen.getAllByRole('button', { name: /^vote for bob$/i })
     expect(bobVoteButtons[0]).toBeDisabled()
@@ -845,7 +843,7 @@ describe('maxVotesPerCandidate', () => {
 
     render(<App campaignId="best-padeller-2026" />)
     await screen.findAllByRole('button', { name: /vote for alice/i })
-    expect(screen.getAllByRole('button', { name: /remove vote for alice/i })[0]).toBeInTheDocument()
+    screen.getAllByRole('button', { name: /remove vote for alice/i })
 
     expect(screen.getByRole('complementary', { name: /voting rules/i })).toHaveTextContent(
       /2 of 3 total votes remaining/i,
@@ -863,7 +861,7 @@ describe('maxVotesPerCandidate', () => {
     expect(getVoteCount()).toBe(3)
     await userEvent.click(screen.getAllByRole('button', { name: /remove vote for alice/i })[0])
     expect(getVoteCount()).toBe(2)
-    expect(screen.getAllByRole('button', { name: /remove vote for alice/i })[0]).toBeInTheDocument()
+    screen.getAllByRole('button', { name: /remove vote for alice/i })
   })
 
   it('can remove all votes for a candidate and add them again', async () => {
@@ -883,7 +881,7 @@ describe('maxVotesPerCandidate', () => {
 
     await userEvent.click(screen.getAllByRole('button', { name: /^vote for alice$/i })[0])
     expect(getVoteCount()).toBe(1)
-    expect(screen.getAllByRole('button', { name: /remove vote for alice/i })[0]).toBeInTheDocument()
+    screen.getAllByRole('button', { name: /remove vote for alice/i })
   })
 
   it('re-enables voting after removing a vote at the per-candidate limit', async () => {
