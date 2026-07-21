@@ -55,19 +55,19 @@ async function getVotes(
 
   const client = getVotesClient()
   await ensureTableExists(client)
-  const votedIds: string[] = []
-  const seen = new Set<string>()
   const voteRecords = await listVoteRecords(campaignId, sessionId)
+
+  // Return vote counts per suggestion: { [suggestionId]: count }
+  const counts: Record<string, number> = {}
   for (const vote of voteRecords) {
-    if (vote.suggestionId && !seen.has(vote.suggestionId)) {
-      seen.add(vote.suggestionId)
-      votedIds.push(vote.suggestionId)
+    if (vote.suggestionId) {
+      counts[vote.suggestionId] = (counts[vote.suggestionId] ?? 0) + 1
     }
   }
 
   return {
     status: 200,
-    jsonBody: votedIds,
+    jsonBody: counts,
     headers: { 'Content-Type': 'application/json' },
   }
 }
