@@ -64,14 +64,18 @@ const testSuggestion: Suggestion = {
 
 function setupApi(
   suggestions: Suggestion[] = [],
-  votedIds: string[] = [],
+  voteCounts: string[] | Map<string, number> = [],
   campaign: Campaign = ninjaCampaign,
   questions: Question[] = ninjaQuestions,
 ) {
   mockFetchCampaign.mockResolvedValue(campaign)
   mockFetchQuestions.mockResolvedValue(questions)
   mockFetchSuggestions.mockResolvedValue(suggestions)
-  mockFetchVoteCounts.mockResolvedValue(new Map(votedIds.map((id) => [id, 1] as [string, number])))
+  mockFetchVoteCounts.mockResolvedValue(
+    voteCounts instanceof Map
+      ? voteCounts
+      : new Map(voteCounts.map((id) => [id, 1] as [string, number])),
+  )
   mockPostSuggestion.mockImplementation(async (campaignId, questionId, name) => {
     const isDuplicate = suggestions.some(
       (s) => s.questionId === questionId && s.name.trim().toLowerCase() === name.trim().toLowerCase(),
@@ -776,13 +780,13 @@ describe('maxVotesPerCandidate', () => {
     expect(mockPostVote).toHaveBeenCalledTimes(1)
     expect(mockPostVote).toHaveBeenLastCalledWith('best-padeller-2026', 'nominees', 'alice', expect.any(String), false)
 
-    // Button should still say "Vote for Alice" (not at limit yet)
     await screen.findAllByRole('button', { name: /vote for alice/i })
+    screen.getAllByRole('button', { name: /remove vote for alice/i })
 
-    // Second vote
     await userEvent.click(screen.getAllByRole('button', { name: /vote for alice/i })[0])
     expect(mockPostVote).toHaveBeenCalledTimes(2)
     expect(mockPostVote).toHaveBeenLastCalledWith('best-padeller-2026', 'nominees', 'alice', expect.any(String), false)
+    screen.getAllByRole('button', { name: /remove vote for alice/i })
   })
 
   it('rejects the third vote on the same suggestion when maxVotesPerCandidate=2', async () => {
@@ -790,16 +794,12 @@ describe('maxVotesPerCandidate', () => {
     mockFetchCampaign.mockResolvedValue(multiVoteCampaign)
     mockFetchQuestions.mockResolvedValue(multiVoteQuestions)
     mockFetchSuggestions.mockResolvedValue(suggestions)
-    // Already has 2 votes → at limit → button shows "Remove vote"
     mockFetchVoteCounts.mockResolvedValue(new Map([['alice', 2]]))
 
     render(<App campaignId="best-padeller-2026" />)
-    // At limit → button should say "Remove vote for Alice"
     await screen.findAllByRole('button', { name: /remove vote for alice/i })
-    expect(screen.getAllByRole('button', { name: /remove vote for alice/i })[0]).toBeInTheDocument()
-
-    // Click would revoke, not cast a 3rd vote
-    expect(screen.queryAllByRole('button', { name: /^vote for alice$/i })).toHaveLength(0)
+    const voteButtons = screen.getAllByRole('button', { name: /^vote for alice$/i })
+    expect(voteButtons[0]).toBeDisabled()
   })
 
   it('maxVotesTotal still blocks votes beyond the campaign total', async () => {
@@ -817,7 +817,6 @@ describe('maxVotesPerCandidate', () => {
     await screen.findAllByRole('button', { name: /remove vote for alice/i })
 
     // alice is at candidate limit → remove button
-    expect(screen.getAllByRole('button', { name: /remove vote for alice/i })[0]).toBeInTheDocument()
     // bob has 1 vote (not at candidate limit of 2), but total is exhausted → vote button is disabled (not remove)
     const bobVoteButtons = screen.getAllByRole('button', { name: /^vote for bob$/i })
     expect(bobVoteButtons[0]).toBeDisabled()
@@ -843,12 +842,62 @@ describe('maxVotesPerCandidate', () => {
     })
 
     render(<App campaignId="best-padeller-2026" />)
-    // 1 vote, not at limit → shows "Vote for Alice"
     await screen.findAllByRole('button', { name: /vote for alice/i })
+    screen.getAllByRole('button', { name: /remove vote for alice/i })
 
     expect(screen.getByRole('complementary', { name: /voting rules/i })).toHaveTextContent(
       /2 of 3 total votes remaining/i,
     )
+  })
+
+  it('removes one vote at a time when a candidate has three votes', async () => {
+    const scenarioCampaign: Campaign = { ...multiVoteCampaign, maxVotesPerCandidate: 3, maxVotesTotal: 3 }
+    const suggestions = [{ ...alice, votes: 3 }]
+    setupApi(suggestions, new Map([['alice', 3]]), scenarioCampaign, multiVoteQuestions)
+
+    render(<App campaignId="best-padeller-2026" />)
+    await screen.findAllByRole('button', { name: /remove vote for alice/i })
+
+    expect(getVoteCount()).toBe(3)
+    await userEvent.click(screen.getAllByRole('button', { name: /remove vote for alice/i })[0])
+    expect(getVoteCount()).toBe(2)
+    screen.getAllByRole('button', { name: /remove vote for alice/i })
+  })
+
+  it('can remove all votes for a candidate and add them again', async () => {
+    const scenarioCampaign: Campaign = { ...multiVoteCampaign, maxVotesPerCandidate: 3, maxVotesTotal: 3 }
+    const suggestions = [{ ...alice, votes: 3 }]
+    setupApi(suggestions, new Map([['alice', 3]]), scenarioCampaign, multiVoteQuestions)
+
+    render(<App campaignId="best-padeller-2026" />)
+    await screen.findAllByRole('button', { name: /remove vote for alice/i })
+
+    await userEvent.click(screen.getAllByRole('button', { name: /remove vote for alice/i })[0])
+    await userEvent.click(screen.getAllByRole('button', { name: /remove vote for alice/i })[0])
+    await userEvent.click(screen.getAllByRole('button', { name: /remove vote for alice/i })[0])
+
+    expect(getVoteCount()).toBe(0)
+    expect(screen.queryByRole('button', { name: /remove vote for alice/i })).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getAllByRole('button', { name: /^vote for alice$/i })[0])
+    expect(getVoteCount()).toBe(1)
+    screen.getAllByRole('button', { name: /remove vote for alice/i })
+  })
+
+  it('re-enables voting after removing a vote at the per-candidate limit', async () => {
+    const suggestions = [{ ...alice, votes: 2 }]
+    setupApi(suggestions, new Map([['alice', 2]]), multiVoteCampaign, multiVoteQuestions)
+
+    render(<App campaignId="best-padeller-2026" />)
+    await screen.findAllByRole('button', { name: /remove vote for alice/i })
+
+    const voteButtons = screen.getAllByRole('button', { name: /^vote for alice$/i })
+    expect(voteButtons[0]).toBeDisabled()
+
+    await userEvent.click(screen.getAllByRole('button', { name: /remove vote for alice/i })[0])
+
+    expect(getVoteCount()).toBe(1)
+    expect(screen.getAllByRole('button', { name: /^vote for alice$/i })[0]).toBeEnabled()
   })
 })
 
