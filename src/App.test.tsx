@@ -64,14 +64,18 @@ const testSuggestion: Suggestion = {
 
 function setupApi(
   suggestions: Suggestion[] = [],
-  votedIds: string[] = [],
+  voteCounts: string[] | Map<string, number> = [],
   campaign: Campaign = ninjaCampaign,
   questions: Question[] = ninjaQuestions,
 ) {
   mockFetchCampaign.mockResolvedValue(campaign)
   mockFetchQuestions.mockResolvedValue(questions)
   mockFetchSuggestions.mockResolvedValue(suggestions)
-  mockFetchVoteCounts.mockResolvedValue(new Map(votedIds.map((id) => [id, 1] as [string, number])))
+  mockFetchVoteCounts.mockResolvedValue(
+    voteCounts instanceof Map
+      ? new Map(voteCounts)
+      : new Map(voteCounts.map((id) => [id, 1] as const)),
+  )
   mockPostSuggestion.mockImplementation(async (campaignId, questionId, name) => {
     const isDuplicate = suggestions.some(
       (s) => s.questionId === questionId && s.name.trim().toLowerCase() === name.trim().toLowerCase(),
@@ -736,9 +740,9 @@ describe('maxVotesPerCandidate', () => {
     status: 'active',
     createdAt: '2024-01-01T00:00:00.000Z',
     allowSuggestions: true,
-    maxVotesTotal: 3,
-    maxVotesPerCategory: 3,
-    maxVotesPerCandidate: 2,
+    maxVotesTotal: 4,
+    maxVotesPerCategory: 4,
+    maxVotesPerCandidate: 3,
   }
 
   const multiVoteQuestions: Question[] = [
@@ -754,71 +758,118 @@ describe('maxVotesPerCandidate', () => {
     votes: 0,
   }
 
-  it('allows two votes on the same suggestion when maxVotesPerCandidate=2', async () => {
-    const suggestions = [{ ...alice }]
-    mockFetchCampaign.mockResolvedValue(multiVoteCampaign)
-    mockFetchQuestions.mockResolvedValue(multiVoteQuestions)
-    mockFetchSuggestions.mockResolvedValue(suggestions)
-    mockFetchVoteCounts.mockResolvedValue(new Map())
+  const bob: Suggestion = {
+    id: 'bob',
+    campaignId: 'best-padeller-2026',
+    questionId: 'nominees',
+    name: 'Bob',
+    createdAt: '2024-01-02T00:00:00.000Z',
+    votes: 0,
+  }
 
+  function setupMultiVoteApi(
+    suggestions: Suggestion[],
+    voteCounts: Map<string, number>,
+    campaign: Campaign = multiVoteCampaign,
+  ) {
+    setupApi(suggestions, voteCounts, campaign, multiVoteQuestions)
     mockPostVote.mockImplementation(async (_cid, _qid, sid, _sid, revoke) => {
-      const s = suggestions.find((x) => x.id === sid)
-      if (!s) return null
-      if (revoke) { s.votes-- } else { s.votes++ }
-      return { ...s }
+      const suggestion = suggestions.find((item) => item.id === sid)
+      if (!suggestion) return null
+      suggestion.votes += revoke ? -1 : 1
+      return { ...suggestion }
     })
+  }
+
+  it('scenario A: removing one of three votes leaves two votes behind', async () => {
+    const suggestions = [{ ...alice, votes: 3 }]
+    setupMultiVoteApi(suggestions, new Map([['alice', 3]]))
 
     render(<App campaignId="best-padeller-2026" />)
-    await screen.findAllByRole('button', { name: /vote for alice/i })
+    await screen.findAllByRole('button', { name: /remove vote for alice/i })
 
-    // First vote
-    await userEvent.click(screen.getAllByRole('button', { name: /vote for alice/i })[0])
-    expect(mockPostVote).toHaveBeenCalledTimes(1)
-    expect(mockPostVote).toHaveBeenLastCalledWith('best-padeller-2026', 'nominees', 'alice', expect.any(String), false)
+    await userEvent.click(screen.getAllByRole('button', { name: /remove vote for alice/i })[0])
 
-    // Button should still say "Vote for Alice" (not at limit yet)
-    await screen.findAllByRole('button', { name: /vote for alice/i })
-
-    // Second vote
-    await userEvent.click(screen.getAllByRole('button', { name: /vote for alice/i })[0])
-    expect(mockPostVote).toHaveBeenCalledTimes(2)
-    expect(mockPostVote).toHaveBeenLastCalledWith('best-padeller-2026', 'nominees', 'alice', expect.any(String), false)
+    expect(getVoteCount()).toBe(2)
+    expect(screen.getAllByRole('button', { name: /remove vote for alice/i })[0]).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /vote for alice/i })[0]).toBeEnabled()
   })
 
-  it('rejects the third vote on the same suggestion when maxVotesPerCandidate=2', async () => {
-    const suggestions = [{ ...alice, votes: 2 }]
-    mockFetchCampaign.mockResolvedValue(multiVoteCampaign)
-    mockFetchQuestions.mockResolvedValue(multiVoteQuestions)
-    mockFetchSuggestions.mockResolvedValue(suggestions)
-    // Already has 2 votes → at limit → button shows "Remove vote"
-    mockFetchVoteCounts.mockResolvedValue(new Map([['alice', 2]]))
+  it('scenario B: removing all three votes reaches zero', async () => {
+    const suggestions = [{ ...alice, votes: 3 }]
+    setupMultiVoteApi(suggestions, new Map([['alice', 3]]))
 
     render(<App campaignId="best-padeller-2026" />)
-    // At limit → button should say "Remove vote for Alice"
     await screen.findAllByRole('button', { name: /remove vote for alice/i })
+
+    await userEvent.click(screen.getAllByRole('button', { name: /remove vote for alice/i })[0])
+    await userEvent.click(screen.getAllByRole('button', { name: /remove vote for alice/i })[0])
+    await userEvent.click(screen.getAllByRole('button', { name: /remove vote for alice/i })[0])
+
+    expect(getVoteCount()).toBe(0)
+    expect(screen.queryByRole('button', { name: /remove vote for alice/i })).not.toBeInTheDocument()
+  })
+
+  it('scenario C: voting works normally again after removing all votes', async () => {
+    const suggestions = [{ ...alice, votes: 3 }]
+    setupMultiVoteApi(suggestions, new Map([['alice', 3]]))
+
+    render(<App campaignId="best-padeller-2026" />)
+    await screen.findAllByRole('button', { name: /remove vote for alice/i })
+
+    for (let i = 0; i < 3; i++) {
+      await userEvent.click(screen.getAllByRole('button', { name: /remove vote for alice/i })[0])
+    }
+
+    expect(getVoteCount()).toBe(0)
+
+    await userEvent.click(screen.getAllByRole('button', { name: /vote for alice/i })[0])
+    await userEvent.click(screen.getAllByRole('button', { name: /vote for alice/i })[0])
+
+    expect(getVoteCount()).toBe(2)
+    expect(screen.getAllByRole('button', { name: /remove vote for alice/i })[0]).toBeInTheDocument()
+    expect(mockPostVote).toHaveBeenLastCalledWith(
+      'best-padeller-2026',
+      'nominees',
+      'alice',
+      expect.any(String),
+      false,
+    )
+  })
+
+  it('scenario D: reaching the per-candidate limit disables adding until a vote is removed', async () => {
+    const suggestions = [{ ...alice }]
+    setupMultiVoteApi(suggestions, new Map())
+
+    render(<App campaignId="best-padeller-2026" />)
+    await screen.findAllByRole('button', { name: /vote for alice/i })
+
+    await userEvent.click(screen.getAllByRole('button', { name: /vote for alice/i })[0])
+    await userEvent.click(screen.getAllByRole('button', { name: /vote for alice/i })[0])
+    await userEvent.click(screen.getAllByRole('button', { name: /vote for alice/i })[0])
+
+    expect(getVoteCount()).toBe(3)
+    expect(screen.getAllByRole('button', { name: /vote for alice/i })[0]).toBeDisabled()
     expect(screen.getAllByRole('button', { name: /remove vote for alice/i })[0]).toBeInTheDocument()
 
-    // Click would revoke, not cast a 3rd vote
-    expect(screen.queryAllByRole('button', { name: /^vote for alice$/i })).toHaveLength(0)
+    await userEvent.click(screen.getAllByRole('button', { name: /remove vote for alice/i })[0])
+
+    expect(getVoteCount()).toBe(2)
+    expect(screen.getAllByRole('button', { name: /vote for alice/i })[0]).toBeEnabled()
+
+    await userEvent.click(screen.getAllByRole('button', { name: /vote for alice/i })[0])
+    expect(getVoteCount()).toBe(3)
   })
 
   it('maxVotesTotal still blocks votes beyond the campaign total', async () => {
-    const bob: Suggestion = { id: 'bob', campaignId: 'best-padeller-2026', questionId: 'nominees', name: 'Bob', createdAt: '2024-01-02T00:00:00.000Z', votes: 0 }
     const suggestions = [{ ...alice, votes: 0 }, { ...bob }]
-    // maxVotesTotal=3, maxVotesPerCandidate=2 — already used 3 total
     const exhaustedCampaign = { ...multiVoteCampaign, maxVotesTotal: 3 }
-    mockFetchCampaign.mockResolvedValue(exhaustedCampaign)
-    mockFetchQuestions.mockResolvedValue(multiVoteQuestions)
-    mockFetchSuggestions.mockResolvedValue(suggestions)
-    // 3 votes used: alice×2, bob×1
-    mockFetchVoteCounts.mockResolvedValue(new Map([['alice', 2], ['bob', 1]]))
+    setupMultiVoteApi(suggestions, new Map([['alice', 2], ['bob', 1]]), exhaustedCampaign)
 
     render(<App campaignId="best-padeller-2026" />)
     await screen.findAllByRole('button', { name: /remove vote for alice/i })
 
-    // alice is at candidate limit → remove button
     expect(screen.getAllByRole('button', { name: /remove vote for alice/i })[0]).toBeInTheDocument()
-    // bob has 1 vote (not at candidate limit of 2), but total is exhausted → vote button is disabled (not remove)
     const bobVoteButtons = screen.getAllByRole('button', { name: /^vote for bob$/i })
     expect(bobVoteButtons[0]).toBeDisabled()
 
@@ -827,28 +878,26 @@ describe('maxVotesPerCandidate', () => {
     )
   })
 
-  it('revoking a vote frees capacity for another vote', async () => {
-    const suggestions = [{ ...alice, votes: 1 }]
-    mockFetchCampaign.mockResolvedValue(multiVoteCampaign)
-    mockFetchQuestions.mockResolvedValue(multiVoteQuestions)
-    mockFetchSuggestions.mockResolvedValue(suggestions)
-    // 1 vote cast for alice, maxVotesTotal=3, maxVotesPerCandidate=2 → not at limit yet
-    mockFetchVoteCounts.mockResolvedValue(new Map([['alice', 1]]))
-
-    mockPostVote.mockImplementation(async (_cid, _qid, sid, _sid, revoke) => {
-      const s = suggestions.find((x) => x.id === sid)
-      if (!s) return null
-      if (revoke) s.votes--; else s.votes++
-      return { ...s }
-    })
+  it('removing a vote frees total capacity for other suggestions again', async () => {
+    const suggestions = [{ ...alice, votes: 3 }, { ...bob }]
+    const exhaustedCampaign = { ...multiVoteCampaign, maxVotesTotal: 3 }
+    setupMultiVoteApi(suggestions, new Map([['alice', 3]]), exhaustedCampaign)
 
     render(<App campaignId="best-padeller-2026" />)
-    // 1 vote, not at limit → shows "Vote for Alice"
-    await screen.findAllByRole('button', { name: /vote for alice/i })
+    await screen.findAllByRole('button', { name: /remove vote for alice/i })
+
+    const bobVoteButton = screen.getAllByRole('button', { name: /vote for bob/i })[0]
+    expect(bobVoteButton).toBeDisabled()
+
+    await userEvent.click(screen.getAllByRole('button', { name: /remove vote for alice/i })[0])
+
+    expect(bobVoteButton).toBeEnabled()
+    await userEvent.click(bobVoteButton)
 
     expect(screen.getByRole('complementary', { name: /voting rules/i })).toHaveTextContent(
-      /2 of 3 total votes remaining/i,
+      /0 of 3 total votes remaining/i,
     )
+    expect(screen.getAllByRole('button', { name: /remove vote for bob/i })[0]).toBeInTheDocument()
   })
 })
 

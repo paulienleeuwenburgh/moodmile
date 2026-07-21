@@ -325,6 +325,13 @@
   white-space: nowrap;
 }
 
+.suggestion-card__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
 /* ── Vote button ─────────────────────────────────────────────────────────── */
 .vote-btn {
   display: flex;
@@ -355,6 +362,18 @@
   outline-offset: 2px;
 }
 
+.vote-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.vote-btn:disabled:hover {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  transform: none;
+}
+
 .vote-btn--voted {
   background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
   border-color: transparent;
@@ -369,6 +388,15 @@
 
 .vote-btn__icon {
   font-size: 0.65rem;
+}
+
+.vote-btn--remove {
+  color: var(--color-secondary);
+}
+
+.vote-btn--remove:hover {
+  background: #fff0f6;
+  border-color: var(--color-secondary);
 }
 
 .suggestion-group__empty {
@@ -495,4 +523,3 @@
     height: 100px;
   }
 }
-

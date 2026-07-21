@@ -3,16 +3,18 @@ import type { Question, Suggestion } from '../types'
 interface SuggestionBoardProps {
   questions: Question[]
   suggestions: Suggestion[]
-  votedIds: Set<string>
   onVote: (suggestionId: string) => void | Promise<void>
+  onRemoveVote: (suggestionId: string) => void | Promise<void>
+  canRemoveVote?: (suggestionId: string) => boolean
   isVoteDisabled?: (suggestionId: string) => boolean
 }
 
 export function SuggestionBoard({
   questions,
   suggestions,
-  votedIds,
   onVote,
+  onRemoveVote,
+  canRemoveVote,
   isVoteDisabled,
 }: SuggestionBoardProps) {
   return (
@@ -35,22 +37,33 @@ export function SuggestionBoard({
               ) : (
                 <ul>
                   {questionSuggestions.map((suggestion) => {
-                    const hasVoted = votedIds.has(suggestion.id)
-                    const isDisabled = !hasVoted && Boolean(isVoteDisabled?.(suggestion.id))
+                    const canRemove = Boolean(canRemoveVote?.(suggestion.id))
+                    const isDisabled = Boolean(isVoteDisabled?.(suggestion.id))
                     return (
                       <li key={suggestion.id} className="suggestion-card">
                         <span className="suggestion-card__name">{suggestion.name}</span>
-                        <button
-                          type="button"
-                          className={`vote-btn${hasVoted ? ' vote-btn--voted' : ''}`}
-                          onClick={() => onVote(suggestion.id)}
-                          disabled={isDisabled}
-                          aria-pressed={hasVoted}
-                          aria-label={hasVoted ? `Remove vote for ${suggestion.name}` : `Vote for ${suggestion.name}`}
-                        >
-                          <span className="vote-btn__icon" aria-hidden="true">▲</span>
-                          <span className="vote-btn__count">{suggestion.votes}</span>
-                        </button>
+                        <div className="suggestion-card__actions">
+                          <button
+                            type="button"
+                            className="vote-btn"
+                            onClick={() => onVote(suggestion.id)}
+                            disabled={isDisabled}
+                            aria-label={`Vote for ${suggestion.name}`}
+                          >
+                            <span className="vote-btn__icon" aria-hidden="true">▲</span>
+                            <span className="vote-btn__count">{suggestion.votes}</span>
+                          </button>
+                          {canRemove && (
+                            <button
+                              type="button"
+                              className="vote-btn vote-btn--remove"
+                              onClick={() => onRemoveVote(suggestion.id)}
+                              aria-label={`Remove vote for ${suggestion.name}`}
+                            >
+                              <span className="vote-btn__icon" aria-hidden="true">−</span>
+                            </button>
+                          )}
+                        </div>
                       </li>
                     )
                   })}
