@@ -35,7 +35,7 @@ export function Leaderboard({
           const userVoteCount = voteCountById.get(suggestion.id) ?? 0
           const hasVotes = userVoteCount > 0
           const isDisabled = Boolean(isVoteDisabled?.(suggestion.id))
-          const isVoteButtonDisabled = usesSingleVoteButton ? !hasVotes && isDisabled : isDisabled
+          const isAddVoteButtonDisabled = usesSingleVoteButton ? !hasVotes && isDisabled : isDisabled
           return (
             <li key={suggestion.id} className="leaderboard-entry">
               <span className="leaderboard-entry__rank" aria-label={`Rank ${index + 1}`}>
@@ -58,7 +58,7 @@ export function Leaderboard({
                   type="button"
                   className={`vote-btn${usesSingleVoteButton && hasVotes ? ' vote-btn--voted' : ''}`}
                   onClick={() => onVote(suggestion.id, usesSingleVoteButton && hasVotes)}
-                  disabled={isVoteButtonDisabled}
+                  disabled={isAddVoteButtonDisabled}
                   aria-pressed={usesSingleVoteButton && hasVotes}
                   aria-label={
                     usesSingleVoteButton && hasVotes

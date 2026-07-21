@@ -42,7 +42,7 @@ export function SuggestionBoard({
                     const userVoteCount = voteCountById.get(suggestion.id) ?? 0
                     const hasVotes = userVoteCount > 0
                     const isDisabled = Boolean(isVoteDisabled?.(suggestion.id))
-                    const isVoteButtonDisabled = usesSingleVoteButton ? !hasVotes && isDisabled : isDisabled
+                    const isAddVoteButtonDisabled = usesSingleVoteButton ? !hasVotes && isDisabled : isDisabled
                     return (
                       <li key={suggestion.id} className="suggestion-card">
                         <span className="suggestion-card__name">{suggestion.name}</span>
@@ -51,7 +51,7 @@ export function SuggestionBoard({
                             type="button"
                             className={`vote-btn${usesSingleVoteButton && hasVotes ? ' vote-btn--voted' : ''}`}
                             onClick={() => onVote(suggestion.id, usesSingleVoteButton && hasVotes)}
-                            disabled={isVoteButtonDisabled}
+                            disabled={isAddVoteButtonDisabled}
                             aria-pressed={usesSingleVoteButton && hasVotes}
                             aria-label={
                               usesSingleVoteButton && hasVotes
