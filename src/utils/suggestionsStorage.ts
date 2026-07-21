@@ -1,6 +1,6 @@
 import type { Suggestion } from '../types'
 
-const STORAGE_KEY = 'moodmile-suggestions-v1'
+const STORAGE_KEY = 'moodmile-suggestions-v2'
 
 export function loadSuggestions(): Suggestion[] {
   try {
@@ -18,7 +18,8 @@ export function loadSuggestions(): Suggestion[] {
       .filter(
         (item): item is Suggestion =>
           typeof item?.id === 'string' &&
-          typeof item?.mascotId === 'string' &&
+          typeof item?.campaignId === 'string' &&
+          typeof item?.questionId === 'string' &&
           typeof item?.name === 'string' &&
           typeof item?.createdAt === 'string',
       )

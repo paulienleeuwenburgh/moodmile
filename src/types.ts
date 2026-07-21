@@ -1,14 +1,43 @@
-export interface Mascot {
+export interface Campaign {
   id: string
   title: string
   description: string
-  image: string
+  status: string
+  createdAt: string
+  updatedAt?: string
+  allowSuggestions: boolean
+  /** Maximum votes a user may cast across the entire campaign. 0 = unlimited. */
+  maxVotesTotal: number
+  /** Maximum votes a user may cast within a single category (question). 0 = unlimited. */
+  maxVotesPerCategory: number
+  /** Maximum votes a user may cast for a single candidate (suggestion). 0 = unlimited. */
+  maxVotesPerCandidate: number
+}
+
+export interface Question {
+  id: string
+  campaignId: string
+  title: string
+  description: string
+  imageUrl?: string
+  sortOrder: number
+  createdAt?: string
+  updatedAt?: string
 }
 
 export interface Suggestion {
   id: string
-  mascotId: string
+  campaignId: string
+  questionId: string
   name: string
   createdAt: string
   votes: number
+}
+
+export interface Vote {
+  campaignId: string
+  questionId: string
+  suggestionId: string
+  sessionId: string
+  createdAt: string
 }

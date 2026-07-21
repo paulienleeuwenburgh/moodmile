@@ -1,47 +1,78 @@
-import type { Mascot, Suggestion } from '../types'
+import type { Campaign, Question, Suggestion } from '../types'
 
 interface SuggestionBoardProps {
-  mascots: Mascot[]
+  campaign: Campaign
+  questions: Question[]
   suggestions: Suggestion[]
-  votedIds: Set<string>
-  onVote: (suggestionId: string) => void | Promise<void>
+  voteCountById: Map<string, number>
+  onVote: (suggestionId: string, revoke: boolean) => void | Promise<void>
+  isVoteDisabled?: (suggestionId: string) => boolean
 }
 
-export function SuggestionBoard({ mascots, suggestions, votedIds, onVote }: SuggestionBoardProps) {
+export function SuggestionBoard({
+  campaign,
+  questions,
+  suggestions,
+  voteCountById,
+  onVote,
+  isVoteDisabled,
+}: SuggestionBoardProps) {
+  const usesSingleVoteButton = campaign.maxVotesPerCandidate === 1
+
   return (
-    <section className="suggestion-board" aria-label="Suggestions by mascot">
-      <h2>Suggestions by mascot</h2>
+    <section className="suggestion-board" aria-label="Suggestions by question">
+      <h2>Suggestions by question</h2>
       <div className="suggestion-board__grid">
-        {mascots.map((mascot) => {
-          const mascotSuggestions = suggestions
-            .filter((suggestion) => suggestion.mascotId === mascot.id)
+        {questions.map((question) => {
+          const questionSuggestions = suggestions
+            .filter((suggestion) => suggestion.questionId === question.id)
             .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
 
           return (
-            <article key={mascot.id} className="suggestion-group">
+            <article key={question.id} className="suggestion-group">
               <header>
-                <img src={mascot.image} alt="" aria-hidden="true" />
-                <h3>{mascot.title}</h3>
+                {question.imageUrl && <img src={question.imageUrl} alt="" aria-hidden="true" />}
+                <h3>{question.title}</h3>
               </header>
-              {mascotSuggestions.length === 0 ? (
+              {questionSuggestions.length === 0 ? (
                 <p className="suggestion-group__empty">No suggestions yet — be the first!</p>
               ) : (
                 <ul>
-                  {mascotSuggestions.map((suggestion) => {
-                    const hasVoted = votedIds.has(suggestion.id)
+                  {questionSuggestions.map((suggestion) => {
+                    const userVoteCount = voteCountById.get(suggestion.id) ?? 0
+                    const hasVotes = userVoteCount > 0
+                    const isDisabled = Boolean(isVoteDisabled?.(suggestion.id))
+                    const isAddVoteButtonDisabled = usesSingleVoteButton ? !hasVotes && isDisabled : isDisabled
                     return (
                       <li key={suggestion.id} className="suggestion-card">
                         <span className="suggestion-card__name">{suggestion.name}</span>
-                        <button
-                          type="button"
-                          className={`vote-btn${hasVoted ? ' vote-btn--voted' : ''}`}
-                          onClick={() => onVote(suggestion.id)}
-                          aria-pressed={hasVoted}
-                          aria-label={hasVoted ? `Remove vote for ${suggestion.name}` : `Vote for ${suggestion.name}`}
-                        >
-                          <span className="vote-btn__icon" aria-hidden="true">▲</span>
-                          <span className="vote-btn__count">{suggestion.votes}</span>
-                        </button>
+                        <div className="vote-actions">
+                          <button
+                            type="button"
+                            className={`vote-btn${usesSingleVoteButton && hasVotes ? ' vote-btn--voted' : ''}`}
+                            onClick={() => onVote(suggestion.id, usesSingleVoteButton && hasVotes)}
+                            disabled={isAddVoteButtonDisabled}
+                            aria-pressed={usesSingleVoteButton && hasVotes}
+                            aria-label={
+                              usesSingleVoteButton && hasVotes
+                                ? `Remove vote for ${suggestion.name}`
+                                : `Vote for ${suggestion.name}`
+                            }
+                          >
+                            <span className="vote-btn__icon" aria-hidden="true">▲</span>
+                            <span className="vote-btn__count">{suggestion.votes}</span>
+                          </button>
+                          {!usesSingleVoteButton && hasVotes && (
+                            <button
+                              type="button"
+                              className="vote-btn vote-btn--voted"
+                              onClick={() => onVote(suggestion.id, true)}
+                              aria-label={`Remove vote for ${suggestion.name}`}
+                            >
+                              <span className="vote-btn__icon" aria-hidden="true">−</span>
+                            </button>
+                          )}
+                        </div>
                       </li>
                     )
                   })}

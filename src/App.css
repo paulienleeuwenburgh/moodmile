@@ -95,7 +95,7 @@
 }
 
 /* ── Mascot card ─────────────────────────────────────────────────────────── */
-.mascot-card {
+.question-card {
   border: 2px solid transparent;
   background: var(--color-surface);
   border-radius: var(--radius-card);
@@ -109,22 +109,22 @@
   flex-direction: column;
 }
 
-.mascot-card:hover {
+.question-card:hover {
   transform: translateY(-4px);
   box-shadow: var(--shadow-card-hover);
 }
 
-.mascot-card:focus-visible {
+.question-card:focus-visible {
   outline: 3px solid rgba(123, 62, 247, 0.5);
   outline-offset: 2px;
 }
 
-.mascot-card--selected {
+.question-card--selected {
   border-color: var(--color-primary);
   box-shadow: var(--shadow-selected);
 }
 
-.mascot-card__image-wrap {
+.question-card__image-wrap {
   background: linear-gradient(160deg, #ede6ff 0%, #ddf4ff 100%);
   display: flex;
   align-items: center;
@@ -133,19 +133,19 @@
   min-height: 160px;
 }
 
-.mascot-card__image {
+.question-card__image {
   width: 120px;
   height: 120px;
   object-fit: contain;
   display: block;
 }
 
-.mascot-card__body {
+.question-card__body {
   padding: 1rem 1.1rem 1.1rem;
   flex: 1;
 }
 
-.mascot-card h3 {
+.question-card h3 {
   margin: 0 0 0.4rem;
   font-size: 1.05rem;
   font-weight: 700;
@@ -153,14 +153,14 @@
   letter-spacing: -0.01em;
 }
 
-.mascot-card p {
+.question-card p {
   margin: 0;
   font-size: 0.875rem;
   color: var(--color-text-muted);
   line-height: 1.5;
 }
 
-.mascot-card--selected .mascot-card__image-wrap {
+.question-card--selected .question-card__image-wrap {
   background: linear-gradient(160deg, var(--color-card-selected-bg) 0%, var(--color-card-selected-end) 100%);
 }
 
@@ -325,6 +325,13 @@
   white-space: nowrap;
 }
 
+.vote-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
 /* ── Vote button ─────────────────────────────────────────────────────────── */
 .vote-btn {
   display: flex;
@@ -486,13 +493,12 @@
     padding: 1rem;
   }
 
-  .mascot-card__image-wrap {
+  .question-card__image-wrap {
     min-height: 130px;
   }
 
-  .mascot-card__image {
+  .question-card__image {
     width: 100px;
     height: 100px;
   }
 }
-

@@ -1,19 +1,19 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import type { Mascot } from '../types'
+import type { Question } from '../types'
 import { validateSuggestion } from '../utils/validateSuggestion'
 
 interface SuggestionFormProps {
-  mascots: Mascot[]
-  selectedMascotId: string
-  onMascotChange: (mascotId: string) => void
+  questions: Question[]
+  selectedQuestionId: string
+  onQuestionChange: (questionId: string) => void
   onSubmitSuggestion: (suggestionText: string) => void | Promise<void>
 }
 
 export function SuggestionForm({
-  mascots,
-  selectedMascotId,
-  onMascotChange,
+  questions,
+  selectedQuestionId,
+  onQuestionChange,
   onSubmitSuggestion,
 }: SuggestionFormProps) {
   const [suggestion, setSuggestion] = useState('')
@@ -44,17 +44,17 @@ export function SuggestionForm({
 
   return (
     <form className="suggestion-form" onSubmit={handleSubmit}>
-      <h2>Submit mascot name suggestions</h2>
+      <h2>Submit name suggestions</h2>
       <div className="suggestion-form__row">
-        <label htmlFor="mascot-select">Mascot</label>
+        <label htmlFor="question-select">Question</label>
         <select
-          id="mascot-select"
-          value={selectedMascotId}
-          onChange={(event) => onMascotChange(event.target.value)}
+          id="question-select"
+          value={selectedQuestionId}
+          onChange={(event) => onQuestionChange(event.target.value)}
         >
-          {mascots.map((mascot) => (
-            <option key={mascot.id} value={mascot.id}>
-              {mascot.title}
+          {questions.map((question) => (
+            <option key={question.id} value={question.id}>
+              {question.title}
             </option>
           ))}
         </select>
