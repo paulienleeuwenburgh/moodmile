@@ -50,7 +50,7 @@ export function SuggestionBoard({
                             type="button"
                             className={`vote-btn${usesSingleVoteButton && hasVotes ? ' vote-btn--voted' : ''}`}
                             onClick={() => onVote(suggestion.id, usesSingleVoteButton && hasVotes)}
-                            disabled={usesSingleVoteButton ? false : isDisabled}
+                            disabled={usesSingleVoteButton ? !hasVotes && isDisabled : isDisabled}
                             aria-pressed={usesSingleVoteButton && hasVotes}
                             aria-label={
                               usesSingleVoteButton && hasVotes
