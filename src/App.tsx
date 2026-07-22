@@ -181,6 +181,14 @@ function App({ campaignId }: AppProps) {
         <p>
           {campaign.description}
         </p>
+        {campaign.bannerImageUrl && (
+          <img
+            src={campaign.bannerImageUrl}
+            alt=""
+            aria-hidden="true"
+            className="hero__banner"
+          />
+        )}
       </section>
 
       <section className="mascots" aria-label="Questions">

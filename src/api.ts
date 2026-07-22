@@ -70,3 +70,69 @@ export async function postVote(
     return null
   }
 }
+
+// ─── Admin API ────────────────────────────────────────────────────────────────
+
+function adminHeaders(adminSecret: string): Record<string, string> {
+  return { 'Content-Type': 'application/json', 'X-Admin-Secret': adminSecret }
+}
+
+export async function adminDeleteSuggestion(
+  adminSecret: string,
+  campaignId: string,
+  questionId: string,
+  suggestionId: string,
+  deletedBy: string,
+  deleteReason: string,
+): Promise<void> {
+  await apiFetch('/admin/suggestions', {
+    method: 'DELETE',
+    headers: adminHeaders(adminSecret),
+    body: JSON.stringify({ campaignId, questionId, suggestionId, deletedBy, deleteReason }),
+  })
+}
+
+export async function adminRestoreSuggestion(
+  adminSecret: string,
+  campaignId: string,
+  questionId: string,
+  suggestionId: string,
+): Promise<void> {
+  await apiFetch('/admin/suggestions/restore', {
+    method: 'POST',
+    headers: adminHeaders(adminSecret),
+    body: JSON.stringify({ campaignId, questionId, suggestionId }),
+  })
+}
+
+export async function adminResetVotes(adminSecret: string, campaignId: string): Promise<void> {
+  await apiFetch(`/admin/campaigns/${encodeURIComponent(campaignId)}/votes`, {
+    method: 'DELETE',
+    headers: adminHeaders(adminSecret),
+  })
+}
+
+export async function adminResetSuggestions(adminSecret: string, campaignId: string): Promise<void> {
+  await apiFetch(`/admin/campaigns/${encodeURIComponent(campaignId)}/suggestions`, {
+    method: 'DELETE',
+    headers: adminHeaders(adminSecret),
+  })
+}
+
+export async function adminFullReset(adminSecret: string, campaignId: string): Promise<void> {
+  await apiFetch(`/admin/campaigns/${encodeURIComponent(campaignId)}/reset`, {
+    method: 'POST',
+    headers: adminHeaders(adminSecret),
+  })
+}
+
+export async function fetchDeletedSuggestions(
+  adminSecret: string,
+  campaignId: string,
+): Promise<(Suggestion & { deletedAt?: string; deletedBy?: string; deleteReason?: string })[]> {
+  return apiFetch<(Suggestion & { deletedAt?: string; deletedBy?: string; deleteReason?: string })[]>(
+    `/admin/suggestions?campaignId=${encodeURIComponent(campaignId)}`,
+    { headers: { 'X-Admin-Secret': adminSecret } },
+  )
+}
+

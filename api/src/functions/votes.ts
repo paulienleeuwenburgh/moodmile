@@ -107,13 +107,13 @@ async function postVote(
   const existingVote = voteRecords.find((vote) => vote.suggestionId === suggestionId)
   const alreadyVoted = Boolean(existingVote)
 
-  // Fetch suggestion entity
+  // Fetch suggestion entity (exclude soft-deleted candidates)
   let suggestionEntity: TableEntityResult<SuggestionEntity> | undefined
   try {
     let found = false
     for await (const entity of suggestionsClient.listEntities<SuggestionEntity>({
       queryOptions: {
-        filter: `PartitionKey eq '${escapeODataString(suggestionPartKey)}' and RowKey eq '${escapeODataString(suggestionId)}'`,
+        filter: `PartitionKey eq '${escapeODataString(suggestionPartKey)}' and RowKey eq '${escapeODataString(suggestionId)}' and isDeleted ne true`,
       },
     })) {
       suggestionEntity = entity
