@@ -9,11 +9,17 @@ export function getClientVoteRecords(
   suggestions: Suggestion[],
   voteCountById: Map<string, number>,
 ): VoteRecord[] {
+  // Build a lookup from suggestionId → questionId for visible (non-deleted) candidates.
+  // Votes for soft-deleted candidates are absent from `suggestions` but still present in
+  // `voteCountById` (the backend never removes vote rows on soft delete). Those votes must
+  // still count against the user's budget — use an empty questionId as a placeholder so
+  // they are included in the total count without being attributed to any live category.
+  const questionBySuggestionId = new Map(suggestions.map((s) => [s.id, s.questionId]))
   const records: VoteRecord[] = []
-  for (const suggestion of suggestions) {
-    const count = voteCountById.get(suggestion.id) ?? 0
+  for (const [suggestionId, count] of voteCountById) {
+    const questionId = questionBySuggestionId.get(suggestionId) ?? ''
     for (let i = 0; i < count; i++) {
-      records.push({ questionId: suggestion.questionId, suggestionId: suggestion.id })
+      records.push({ questionId, suggestionId })
     }
   }
   return records
