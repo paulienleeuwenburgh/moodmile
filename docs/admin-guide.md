@@ -24,9 +24,38 @@ Add `ADMIN_SECRET` to your Azure Functions application settings (or `local.setti
 
 ### 2. Access the admin panel
 
-Navigate to `/admin` in the app. Enter the admin secret in the password field, then enter a Campaign ID and click **Load campaign**.
+Navigate to `/admin` in the app. Enter the admin secret in the password field, enter a Campaign ID, and click **Load campaign**.
 
-> **Security note:** The secret is kept in browser memory only. It is never written to `localStorage`, cookies, or sent in GET requests. HTTPS is enforced by Azure Static Web Apps for all traffic.
+On success, a green **"Admin access granted"** banner appears at the top, showing the campaign title and a **Logout** button that clears the secret from browser memory.
+
+> **Security note:** The secret is kept in React component state only. It is never written to `localStorage`, cookies, or sent in GET requests. HTTPS is enforced by Azure Static Web Apps for all traffic.
+
+---
+
+## Admin panel overview
+
+### Authentication state
+
+| State | Indicator |
+|---|---|
+| Unauthenticated | Login form visible |
+| Authenticated | Green banner: "Admin access granted — Campaign: \<title\>" + Logout button |
+
+The **Logout** button clears the secret and all campaign data from memory and returns the UI to the login form.
+
+### Campaign summary
+
+After loading a campaign, a summary panel shows:
+
+| Field | Description |
+|---|---|
+| Status | Current campaign status (`draft`, `active`, `closed`) |
+| Active candidates | Number of non-deleted candidates |
+| Deleted candidates | Number of soft-deleted candidates (highlighted when > 0) |
+| Total votes cast | Sum of all vote counts across active and deleted candidates |
+| Last modified | `updatedAt` timestamp from the campaign row (if set) |
+
+This gives the admin an at-a-glance picture of campaign state before taking any action.
 
 ---
 
@@ -42,6 +71,7 @@ Navigate to `/admin` in the app. Enter the admin secret in the password field, t
   - `deletedAt`: ISO timestamp
   - `deletedBy`: admin identifier (optional, entered in the UI)
   - `deleteReason`: reason (optional, entered in the UI)
+- **Confirmation dialog:** Shows candidate name, question, current vote count, and notes that votes are preserved.
 - **Reversible:** Yes — see *Restore a candidate* below.
 
 ### Restore a candidate
@@ -50,25 +80,62 @@ Navigate to `/admin` in the app. Enter the admin secret in the password field, t
 - **Votes:** The original vote count is restored intact.
 - **Voting:** Users can vote for or revoke votes on the candidate again as normal.
 - **Note:** Votes cast before deletion still count against users' budgets (they were never refunded), so a restored candidate may show existing votes from before it was deleted.
+- **Confirmation dialog:** Shows candidate name, question, vote count that will be restored. Confirm button is green to signal this is a safe operation.
 
 ### Reset campaign votes
 
-- **Effect:** All vote rows for the campaign are deleted. Every candidate's vote counter is reset to `0`.
-- **Candidates:** Not affected — all active and soft-deleted candidates are preserved.
-- **Reversible:** No.
+- **Affects:** All vote rows for the campaign are deleted. Every candidate's vote counter is reset to `0`.
+- **Preserved:** All candidates (active and soft-deleted) remain intact.
+- **Confirmation dialog:** Lists what is affected and what is preserved. Cannot be undone.
 
 ### Reset campaign candidates
 
-- **Effect:** All active (non-deleted) candidates are soft-deleted. All votes are also removed.
+- **Affects:** All active (non-deleted) candidates are soft-deleted. All votes are also removed.
+- **Preserved:** Campaign settings (title, status, voting rules) are unchanged. Soft-deleted candidates can be restored individually.
 - **Vote history:** Soft-deleted candidates retain their rows in storage. Vote rows are deleted.
 - **Reason for soft delete (not hard delete):** Keeping candidate rows means the suggestion IDs in historical vote rows remain resolvable. Hard-deleting candidates would leave orphaned vote row keys, making audit data unexplainable.
-- **Reversible:** Candidates can be restored individually. Votes cannot be recovered.
+- **Confirmation dialog:** Displays the count of candidates that will be affected and notes that votes cannot be recovered.
 
 ### Full campaign reset
 
-- **Effect:** Combines vote reset + candidate reset. All votes are deleted and all candidates are soft-deleted.
-- **Campaign configuration:** Title, status, and voting rules are untouched.
-- **Reversible:** Candidates can be restored individually. Votes cannot be recovered.
+- **Affects:** All votes are deleted and all candidates are soft-deleted.
+- **Preserved:** Campaign configuration (title, status, and voting rules) is untouched.
+- **Safety requirement:** The admin must type the exact campaign ID in the confirmation dialog before the confirm button becomes active. This prevents accidental data loss.
+- **Confirmation dialog:** Prominently warns this is the most destructive operation available. Requires typing the campaign ID.
+
+---
+
+## Deleted candidates
+
+The **Deleted candidates** section displays:
+
+| Column | Description |
+|---|---|
+| Category | Question/category the candidate belongs to |
+| Candidate | Candidate name |
+| Votes | Vote count at time of deletion (preserved for audit) |
+| Deleted at | Full date and time of deletion |
+| Deleted by | Admin identifier who deleted the candidate (if provided) |
+| Reason | Deletion reason (if provided) |
+| Action | **Restore** button (green) |
+
+Soft-deleted candidates are hidden from voters but kept in storage for audit purposes. Vote counts are preserved even while deleted.
+
+---
+
+## Operational clarity
+
+Each action card in the admin panel shows:
+- **Affects:** what data will be changed or deleted.
+- **Preserved:** what data is kept intact.
+
+Visual hierarchy by risk level:
+
+| Risk | Styling | Examples |
+|---|---|---|
+| Low (restore) | Green button | Restore candidate |
+| Medium (delete) | Red-outline button | Delete candidate, Reset votes, Reset candidates |
+| High (full reset) | Red-background button + warning card | Full campaign reset |
 
 ---
 
@@ -103,6 +170,21 @@ Changing vote limits after votes have been cast does **not** retroactively inval
 
 ---
 
+## Error messages
+
+The admin panel maps API error codes to specific messages:
+
+| Situation | Message shown |
+|---|---|
+| Wrong admin secret | "Invalid admin secret. Please check your credentials and try again." |
+| `ADMIN_SECRET` not configured | "Admin access is not configured on this server. Contact your administrator." |
+| Campaign ID not found | "Campaign not found. Please check the Campaign ID and try again." |
+| Server error (5xx) | "Unexpected server error. Please try again later." |
+| Network failure | "API unavailable. Please check your connection and try again." |
+| Other API errors | The server's error message is shown directly |
+
+---
+
 ## API reference
 
 All admin routes require the `X-Admin-Secret: <secret>` header.
@@ -128,3 +210,4 @@ All admin routes require the `X-Admin-Secret: <secret>` header.
 | `404` | Campaign or suggestion not found |
 | `409` | Conflict (e.g. candidate already deleted, or no vote to revoke) |
 | `501` | `ADMIN_SECRET` not configured on the server |
+
