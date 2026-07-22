@@ -89,7 +89,9 @@ async function deleteSuggestion(
     campaignId?: string
     questionId?: string
     suggestionId?: string
+    /** Optional: name or identifier of the admin performing the deletion. Stored for audit. */
     deletedBy?: string
+    /** Optional: reason for the deletion. Stored for audit and displayed in the admin panel. */
     deleteReason?: string
   }
   const { campaignId, questionId, suggestionId, deletedBy, deleteReason } = body
