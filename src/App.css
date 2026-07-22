@@ -518,7 +518,7 @@
   }
 }
 
-/* ── Admin panel ─────────────────────────────────────────────────────────── */
+/* Admin panel */
 .admin-section {
   background: var(--color-surface);
   border-radius: var(--radius-card);
@@ -538,6 +538,248 @@
 
 .admin-section--danger {
   border-left: 3px solid var(--color-secondary);
+}
+
+/* ── Auth status section ──────────────────────────────────────────────────── */
+.admin-section--auth {
+  border-left: 3px solid #16a34a;
+  background: linear-gradient(135deg, #f0fdf4 0%, var(--color-surface) 100%);
+  padding: 1rem 1.5rem;
+}
+
+.admin-auth-bar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.admin-auth-bar__status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.admin-auth-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  background: #16a34a;
+  color: #fff;
+  border-radius: 50%;
+  font-size: 0.75rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.admin-auth-bar__label {
+  font-size: 0.925rem;
+  font-weight: 700;
+  color: #15803d;
+}
+
+.admin-auth-bar__campaign {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-auth-bar__campaign-title {
+  font-size: 0.925rem;
+  font-weight: 600;
+  color: var(--color-ninja-mid);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-auth-bar__campaign-id {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.admin-btn--logout {
+  color: var(--color-text-muted);
+  border-color: var(--color-border);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.admin-btn--logout:hover {
+  color: var(--color-secondary);
+  border-color: var(--color-secondary);
+  background: rgba(228, 25, 92, 0.06);
+}
+
+/* ── Campaign summary panel ───────────────────────────────────────────────── */
+.admin-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 0.75rem;
+}
+
+.admin-summary-card {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.admin-summary-card--warning {
+  border-color: #fca5a5;
+  background: #fff7f7;
+}
+
+.admin-summary-card__value {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--color-ninja-mid);
+  line-height: 1.1;
+}
+
+.admin-summary-card__value--status {
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-transform: capitalize;
+  padding: 0.2rem 0.6rem;
+  border-radius: 20px;
+  display: inline-block;
+  background: var(--color-tag-bg);
+  color: var(--color-primary);
+  border: 1px solid var(--color-border);
+  width: fit-content;
+}
+
+.admin-summary-card__label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ── Action card affects/preserves labels ─────────────────────────────────── */
+.admin-action__affects {
+  font-weight: 700;
+  color: var(--color-secondary);
+}
+
+.admin-action__preserves {
+  font-weight: 700;
+  color: #15803d;
+}
+
+.admin-action--destructive {
+  border: 1.5px solid rgba(228, 25, 92, 0.3);
+  background: rgba(228, 25, 92, 0.04);
+}
+
+.admin-action--destructive strong {
+  color: var(--color-secondary);
+}
+
+/* ── Restore button (positive/safe action) ────────────────────────────────── */
+.admin-btn--restore {
+  color: #15803d;
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+
+.admin-btn--restore:hover {
+  background: #dcfce7;
+  border-color: #16a34a;
+  color: #14532d;
+}
+
+/* ── Global feedback messages ────────────────────────────────────────────── */
+.admin-feedback {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-xs);
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.admin-feedback--error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: var(--color-secondary);
+}
+
+.admin-feedback--success {
+  background: #f0fdf4;
+  border: 1px solid #86efac;
+  color: #15803d;
+}
+
+.admin-feedback span {
+  flex: 1;
+}
+
+.admin-feedback__dismiss {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0;
+  color: inherit;
+  opacity: 0.55;
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+.admin-feedback__dismiss:hover {
+  opacity: 1;
+}
+
+/* ── Confirmation dialog — typed confirmation field ───────────────────────── */
+.admin-dialog__confirm-field {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.75rem;
+  background: var(--color-bg);
+  border-radius: var(--radius-xs);
+  border: 1.5px solid var(--color-border);
+}
+
+.admin-dialog__confirm-label {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}
+
+.admin-dialog__confirm-input {
+  border-radius: var(--radius-xs);
+  border: 1.5px solid var(--color-border);
+  padding: 0.55rem 0.8rem;
+  font: inherit;
+  font-size: 0.925rem;
+  color: var(--color-text);
+  background: var(--color-surface);
+  transition: border-color 0.15s ease;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.admin-dialog__confirm-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(123, 62, 247, 0.15);
 }
 
 .admin-section__description {
@@ -627,6 +869,12 @@
 .admin-btn--destructive:hover {
   background: var(--color-secondary-dark);
   border-color: var(--color-secondary-dark);
+}
+
+.admin-btn--destructive:disabled {
+  background: var(--color-secondary);
+  border-color: var(--color-secondary);
+  opacity: 0.4;
 }
 
 .admin-btn--sm {
@@ -812,4 +1060,3 @@
   gap: 0.75rem;
   justify-content: flex-end;
 }
-
