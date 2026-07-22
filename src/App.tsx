@@ -9,6 +9,7 @@ import type { Campaign, Question, Suggestion } from './types'
 import { fetchCampaign, fetchQuestions, fetchSuggestions, fetchVoteCounts, postSuggestion, postVote } from './api'
 import { getSessionId } from './utils/sessionId'
 import { canCastVote, getClientVoteRecords } from './utils/voteLimits'
+import { handleImageError } from './utils/imageError'
 
 interface AppProps {
   campaignId: string
@@ -190,7 +191,7 @@ function App({ campaignId }: AppProps) {
             alt=""
             aria-hidden="true"
             className="hero__banner"
-            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+            onError={handleImageError}
           />
         )}
       </section>

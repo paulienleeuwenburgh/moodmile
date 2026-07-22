@@ -1,4 +1,5 @@
 import type { Campaign, Question, Suggestion } from '../types'
+import { handleImageError } from '../utils/imageError'
 
 interface SuggestionBoardProps {
   campaign: Campaign
@@ -36,7 +37,7 @@ export function SuggestionBoard({
                     src={question.imageUrl}
                     alt=""
                     aria-hidden="true"
-                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+                    onError={handleImageError}
                   />
                 )}
                 <h3>{question.title}</h3>

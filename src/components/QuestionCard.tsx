@@ -1,4 +1,5 @@
 import type { Question } from '../types'
+import { handleImageError } from '../utils/imageError'
 
 interface QuestionCardProps {
   question: Question
@@ -20,7 +21,7 @@ export function QuestionCard({ question, isSelected, onSelect }: QuestionCardPro
             src={question.imageUrl}
             alt={question.title}
             className="question-card__image"
-            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+            onError={handleImageError}
           />
         )}
       </div>

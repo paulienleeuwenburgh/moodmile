@@ -1,4 +1,5 @@
 import type { Campaign, Question, Suggestion } from '../types'
+import { handleImageError } from '../utils/imageError'
 
 interface LeaderboardProps {
   campaign: Campaign
@@ -47,7 +48,7 @@ export function Leaderboard({
                   alt=""
                   aria-hidden="true"
                   className="leaderboard-entry__mascot"
-                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+                  onError={handleImageError}
                 />
               )}
               <span className="leaderboard-entry__name">{suggestion.name}</span>

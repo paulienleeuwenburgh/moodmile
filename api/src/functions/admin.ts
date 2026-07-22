@@ -76,7 +76,7 @@ function requireAdminSecret(request: HttpRequest): HttpResponseInit | null {
   return null
 }
 
-// ─── DELETE /api/admin/suggestions ───────────────────────────────────────────
+// ─── DELETE /api/mgmt/suggestions ───────────────────────────────────────────
 
 async function deleteSuggestion(
   request: HttpRequest,
@@ -140,7 +140,7 @@ async function deleteSuggestion(
   return { status: 200, jsonBody: { success: true } }
 }
 
-// ─── POST /api/admin/suggestions/restore ─────────────────────────────────────
+// ─── POST /api/mgmt/suggestions/restore ─────────────────────────────────────
 
 async function restoreSuggestion(
   request: HttpRequest,
@@ -204,7 +204,7 @@ async function restoreSuggestion(
   return { status: 200, jsonBody: { success: true } }
 }
 
-// ─── DELETE /api/admin/campaigns/{campaignId}/votes ──────────────────────────
+// ─── DELETE /api/mgmt/campaigns/{campaignId}/votes ──────────────────────────
 
 async function resetCampaignVotes(
   request: HttpRequest,
@@ -222,7 +222,7 @@ async function resetCampaignVotes(
   return { status: 200, jsonBody: { success: true } }
 }
 
-// ─── DELETE /api/admin/campaigns/{campaignId}/suggestions ────────────────────
+// ─── DELETE /api/mgmt/campaigns/{campaignId}/suggestions ────────────────────
 
 async function resetCampaignSuggestions(
   request: HttpRequest,
@@ -242,7 +242,7 @@ async function resetCampaignSuggestions(
   return { status: 200, jsonBody: { success: true } }
 }
 
-// ─── POST /api/admin/campaigns/{campaignId}/reset ────────────────────────────
+// ─── POST /api/mgmt/campaigns/{campaignId}/reset ────────────────────────────
 
 async function fullCampaignReset(
   request: HttpRequest,
@@ -347,7 +347,7 @@ async function processBatches<T>(
   }
 }
 
-// ─── GET /api/admin/suggestions?campaignId=X ─────────────────────────────────
+// ─── GET /api/mgmt/suggestions?campaignId=X ─────────────────────────────────
 
 /**
  * Returns all soft-deleted suggestions for a campaign.
