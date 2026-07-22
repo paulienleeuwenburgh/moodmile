@@ -90,6 +90,7 @@ async function postSuggestion(
     name,
     createdAt,
     votes: 0,
+    isDeleted: false,
   })
 
   return {

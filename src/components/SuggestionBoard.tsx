@@ -31,7 +31,14 @@ export function SuggestionBoard({
           return (
             <article key={question.id} className="suggestion-group">
               <header>
-                {question.imageUrl && <img src={question.imageUrl} alt="" aria-hidden="true" />}
+                {question.imageUrl && (
+                  <img
+                    src={question.imageUrl}
+                    alt=""
+                    aria-hidden="true"
+                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+                  />
+                )}
                 <h3>{question.title}</h3>
               </header>
               {questionSuggestions.length === 0 ? (

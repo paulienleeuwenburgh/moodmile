@@ -13,31 +13,36 @@
  *   - This is a shared API key model suitable for "no Entra ID yet" phase. When Entra ID is
  *     added, replace requireAdminSecret() with token validation.
  *
+ * Route prefix: mgmt/
+ *   Azure Functions reserves the "admin/" route prefix for its built-in host management API.
+ *   Any HTTP trigger route starting with "admin/" is intercepted by the Functions runtime
+ *   instead of reaching user-defined handlers. This module uses "mgmt/" to avoid that conflict.
+ *
  * Routes:
- *   DELETE /api/admin/suggestions
+ *   DELETE /api/mgmt/suggestions
  *     Body: { campaignId, questionId, suggestionId, deletedBy?, deleteReason? }
  *     Soft-deletes a candidate. The suggestion row is kept; isDeleted is set to true.
  *     Existing vote rows are preserved — vote history remains explainable.
  *     The candidate no longer appears in GET /api/suggestions or rankings.
  *     Votes already cast for the candidate are NOT refunded to users' budgets.
  *
- *   POST /api/admin/suggestions/restore
+ *   POST /api/mgmt/suggestions/restore
  *     Body: { campaignId, questionId, suggestionId }
  *     Restores a soft-deleted candidate. Sets isDeleted = false and clears delete metadata.
  *     The candidate reappears with its original vote count intact.
  *     Voting resumes as normal; users who voted before deletion can vote again (or revoke).
  *
- *   DELETE /api/admin/campaigns/{campaignId}/votes
+ *   DELETE /api/mgmt/campaigns/{campaignId}/votes
  *     Removes all vote rows for the campaign and resets every suggestion's vote counter to 0.
  *     Suggestions (including soft-deleted ones) are preserved.
  *
- *   DELETE /api/admin/campaigns/{campaignId}/suggestions
+ *   DELETE /api/mgmt/campaigns/{campaignId}/suggestions
  *     Soft-deletes all active (non-deleted) suggestions for the campaign.
  *     Also removes all vote rows for the campaign and resets vote counters to 0.
  *     Rationale: keeping soft-deleted rows means vote rows still reference valid suggestion IDs,
  *     making historical data explainable. Hard deletion would leave orphaned vote rows.
  *
- *   POST /api/admin/campaigns/{campaignId}/reset
+ *   POST /api/mgmt/campaigns/{campaignId}/reset
  *     Full campaign reset: removes all votes AND soft-deletes all suggestions.
  *     Campaign configuration (title, status, voting rules) is untouched.
  */
@@ -389,41 +394,41 @@ async function getDeletedSuggestions(
 app.http('adminGetDeletedSuggestions', {
   methods: ['GET'],
   authLevel: 'anonymous',
-  route: 'admin/suggestions',
+  route: 'mgmt/suggestions',
   handler: getDeletedSuggestions,
 })
 
 app.http('adminDeleteSuggestion', {
   methods: ['DELETE'],
   authLevel: 'anonymous',
-  route: 'admin/suggestions',
+  route: 'mgmt/suggestions',
   handler: deleteSuggestion,
 })
 
 app.http('adminRestoreSuggestion', {
   methods: ['POST'],
   authLevel: 'anonymous',
-  route: 'admin/suggestions/restore',
+  route: 'mgmt/suggestions/restore',
   handler: restoreSuggestion,
 })
 
 app.http('adminResetCampaignVotes', {
   methods: ['DELETE'],
   authLevel: 'anonymous',
-  route: 'admin/campaigns/{campaignId}/votes',
+  route: 'mgmt/campaigns/{campaignId}/votes',
   handler: resetCampaignVotes,
 })
 
 app.http('adminResetCampaignSuggestions', {
   methods: ['DELETE'],
   authLevel: 'anonymous',
-  route: 'admin/campaigns/{campaignId}/suggestions',
+  route: 'mgmt/campaigns/{campaignId}/suggestions',
   handler: resetCampaignSuggestions,
 })
 
 app.http('adminFullCampaignReset', {
   methods: ['POST'],
   authLevel: 'anonymous',
-  route: 'admin/campaigns/{campaignId}/reset',
+  route: 'mgmt/campaigns/{campaignId}/reset',
   handler: fullCampaignReset,
 })

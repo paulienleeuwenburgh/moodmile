@@ -47,6 +47,7 @@ export function Leaderboard({
                   alt=""
                   aria-hidden="true"
                   className="leaderboard-entry__mascot"
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
                 />
               )}
               <span className="leaderboard-entry__name">{suggestion.name}</span>

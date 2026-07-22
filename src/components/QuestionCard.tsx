@@ -16,7 +16,12 @@ export function QuestionCard({ question, isSelected, onSelect }: QuestionCardPro
     >
       <div className="question-card__image-wrap">
         {question.imageUrl && (
-          <img src={question.imageUrl} alt={question.title} className="question-card__image" />
+          <img
+            src={question.imageUrl}
+            alt={question.title}
+            className="question-card__image"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+          />
         )}
       </div>
       <div className="question-card__body">

@@ -21,6 +21,7 @@ function App({ campaignId }: AppProps) {
   const [selectedQuestionId, setSelectedQuestionId] = useState('')
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const [voteCountById, setVoteCountById] = useState<Map<string, number>>(new Map())
+  const [actionError, setActionError] = useState<string | null>(null)
 
   const voteRecords = getClientVoteRecords(suggestions, voteCountById)
 
@@ -93,8 +94,9 @@ function App({ campaignId }: AppProps) {
           setSuggestions((current) => current.filter((s) => s.id !== tempId))
         }
       })
-      .catch(() => {
+      .catch((err: unknown) => {
         setSuggestions((current) => current.filter((s) => s.id !== tempId))
+        setActionError(err instanceof Error ? err.message : 'Failed to save suggestion. Please try again.')
       })
   }
 
@@ -118,6 +120,7 @@ function App({ campaignId }: AppProps) {
     )
 
     if (!updated) {
+      setActionError('Vote could not be saved. Please try again.')
       return
     }
 
@@ -187,9 +190,24 @@ function App({ campaignId }: AppProps) {
             alt=""
             aria-hidden="true"
             className="hero__banner"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
           />
         )}
       </section>
+
+      {actionError && (
+        <p className="action-error" role="alert">
+          {actionError}
+          <button
+            type="button"
+            className="action-error__dismiss"
+            aria-label="Dismiss"
+            onClick={() => setActionError(null)}
+          >
+            ×
+          </button>
+        </p>
+      )}
 
       <section className="mascots" aria-label="Questions">
         {questions.map((question) => (

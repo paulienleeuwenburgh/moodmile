@@ -107,14 +107,18 @@ Changing vote limits after votes have been cast does **not** retroactively inval
 
 All admin routes require the `X-Admin-Secret: <secret>` header.
 
+> **Note:** The route prefix `mgmt/` (not `admin/`) is used because Azure Functions reserves the
+> `admin/` prefix for its built-in host management API. Any HTTP trigger with a route starting
+> with `admin/` is intercepted by the Functions runtime and never reaches user-defined handlers.
+
 | Method | Route | Action |
 |---|---|---|
-| `GET` | `/api/admin/suggestions?campaignId=X` | List soft-deleted candidates for a campaign |
-| `DELETE` | `/api/admin/suggestions` | Soft-delete a candidate (body: `{ campaignId, questionId, suggestionId, deletedBy?, deleteReason? }`) |
-| `POST` | `/api/admin/suggestions/restore` | Restore a soft-deleted candidate (body: `{ campaignId, questionId, suggestionId }`) |
-| `DELETE` | `/api/admin/campaigns/{campaignId}/votes` | Reset all votes for a campaign |
-| `DELETE` | `/api/admin/campaigns/{campaignId}/suggestions` | Soft-delete all candidates + reset votes |
-| `POST` | `/api/admin/campaigns/{campaignId}/reset` | Full reset (votes + soft-delete candidates) |
+| `GET` | `/api/mgmt/suggestions?campaignId=X` | List soft-deleted candidates for a campaign |
+| `DELETE` | `/api/mgmt/suggestions` | Soft-delete a candidate (body: `{ campaignId, questionId, suggestionId, deletedBy?, deleteReason? }`) |
+| `POST` | `/api/mgmt/suggestions/restore` | Restore a soft-deleted candidate (body: `{ campaignId, questionId, suggestionId }`) |
+| `DELETE` | `/api/mgmt/campaigns/{campaignId}/votes` | Reset all votes for a campaign |
+| `DELETE` | `/api/mgmt/campaigns/{campaignId}/suggestions` | Soft-delete all candidates + reset votes |
+| `POST` | `/api/mgmt/campaigns/{campaignId}/reset` | Full reset (votes + soft-delete candidates) |
 
 ### Error responses
 
