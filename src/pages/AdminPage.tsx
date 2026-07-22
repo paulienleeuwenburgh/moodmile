@@ -86,8 +86,8 @@ export function AdminPage() {
       ])
       setSuggestions(s)
       setDeletedSuggestions(d)
-    } catch {
-      // ignore refresh errors silently
+    } catch (err) {
+      console.error('Failed to refresh campaign data:', err)
     }
   }
 
@@ -344,7 +344,7 @@ export function AdminPage() {
             <p className="admin-section__description">
               Soft-deleted candidates are hidden from voters but preserved for audit.
               Restoring a candidate makes it visible again with its original vote count intact.
-              Votes previously cast for this candidate count against voters&#39; budgets even while deleted.
+              Votes previously cast for this candidate count against voters' budgets even while deleted.
             </p>
             {deletedSuggestions.length === 0 ? (
               <p className="admin-empty">No deleted candidates.</p>

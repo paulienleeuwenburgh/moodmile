@@ -261,46 +261,38 @@ async function fullCampaignReset(
 /**
  * Remove all vote rows for a campaign and reset vote counters to 0 on all suggestions.
  * Vote rows are partitioned by "{campaignId}|{sessionId}", so we use a range scan.
+ * Deletions and updates are processed in batches to limit concurrent operations.
  */
 async function doResetVotes(campaignId: string): Promise<void> {
   const votesClient = getVotesClient()
   const suggestionsClient = getSuggestionsClient()
   await Promise.all([ensureTableExists(votesClient), ensureTableExists(suggestionsClient)])
 
-  // Delete all vote rows for this campaign.
+  // Delete all vote rows for this campaign in batches.
   // Votes are partitioned by "{campaignId}|{sessionId}" — different partition keys per session,
   // so batch operations cannot be used. Each row is deleted individually.
   const voteFilter = `PartitionKey ge '${escapeODataString(campaignId)}|' and PartitionKey lt '${escapeODataString(campaignId)}~'`
-  const deletePromises: Promise<unknown>[] = []
+  const votesToDelete: { partitionKey: string; rowKey: string }[] = []
   for await (const entity of votesClient.listEntities<VoteEntity>({
     queryOptions: { filter: voteFilter },
   })) {
-    deletePromises.push(
-      votesClient.deleteEntity(entity.partitionKey as string, entity.rowKey as string),
-    )
+    votesToDelete.push({ partitionKey: entity.partitionKey as string, rowKey: entity.rowKey as string })
   }
-  await Promise.all(deletePromises)
+  await processBatches(votesToDelete, (item) => votesClient.deleteEntity(item.partitionKey, item.rowKey))
 
   // Reset vote counters on all suggestions (including soft-deleted ones, for consistency).
+  // Process unconditionally to ensure the votes field is always explicitly set to 0,
+  // even if the field was previously undefined or null in older rows.
   const suggestionFilter = `PartitionKey ge '${escapeODataString(campaignId)}|' and PartitionKey lt '${escapeODataString(campaignId)}~'`
-  const resetPromises: Promise<unknown>[] = []
+  const suggestionsToReset: { partitionKey: string; rowKey: string }[] = []
   for await (const entity of suggestionsClient.listEntities<SuggestionEntity>({
     queryOptions: { filter: suggestionFilter },
   })) {
-    if ((entity.votes ?? 0) !== 0) {
-      resetPromises.push(
-        suggestionsClient.updateEntity(
-          {
-            partitionKey: entity.partitionKey as string,
-            rowKey: entity.rowKey as string,
-            votes: 0,
-          },
-          'Merge',
-        ),
-      )
-    }
+    suggestionsToReset.push({ partitionKey: entity.partitionKey as string, rowKey: entity.rowKey as string })
   }
-  await Promise.all(resetPromises)
+  await processBatches(suggestionsToReset, (item) =>
+    suggestionsClient.updateEntity({ partitionKey: item.partitionKey, rowKey: item.rowKey, votes: 0 }, 'Merge'),
+  )
 }
 
 /**
@@ -313,26 +305,41 @@ async function doSoftDeleteAllSuggestions(campaignId: string): Promise<void> {
 
   const filter = `PartitionKey ge '${escapeODataString(campaignId)}|' and PartitionKey lt '${escapeODataString(campaignId)}~' and isDeleted ne true`
   const now = new Date().toISOString()
-  const promises: Promise<unknown>[] = []
+  const toDelete: { partitionKey: string; rowKey: string }[] = []
 
   for await (const entity of client.listEntities<SuggestionEntity>({
     queryOptions: { filter },
   })) {
-    promises.push(
-      client.updateEntity(
-        {
-          partitionKey: entity.partitionKey as string,
-          rowKey: entity.rowKey as string,
-          isDeleted: true,
-          deletedAt: now,
-          deletedBy: 'admin-reset',
-          deleteReason: 'campaign reset',
-        },
-        'Merge',
-      ),
-    )
+    toDelete.push({ partitionKey: entity.partitionKey as string, rowKey: entity.rowKey as string })
   }
-  await Promise.all(promises)
+
+  await processBatches(toDelete, (item) =>
+    client.updateEntity(
+      {
+        partitionKey: item.partitionKey,
+        rowKey: item.rowKey,
+        isDeleted: true,
+        deletedAt: now,
+        deletedBy: 'admin-reset',
+        deleteReason: 'campaign reset',
+      },
+      'Merge',
+    ),
+  )
+}
+
+/**
+ * Process an array of items in parallel batches to avoid unbounded memory growth
+ * and excessive concurrent API calls.
+ */
+async function processBatches<T>(
+  items: T[],
+  fn: (item: T) => Promise<unknown>,
+  batchSize = 100,
+): Promise<void> {
+  for (let i = 0; i < items.length; i += batchSize) {
+    await Promise.all(items.slice(i, i + batchSize).map(fn))
+  }
 }
 
 // ─── GET /api/admin/suggestions?campaignId=X ─────────────────────────────────

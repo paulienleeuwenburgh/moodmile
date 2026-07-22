@@ -52,7 +52,7 @@ export function validateCampaignRules(config: CampaignRuleInput): string[] {
     )
   } else if (maxVotesPerCandidate > 0 && maxVotesPerCategory > 0 && maxVotesPerCandidate > maxVotesPerCategory) {
     errors.push(
-      `maxVotesPerCandidate (${maxVotesPerCandidate}) cannot exceed maxVotesPerCategory (${maxVotesPerCategory}).`,
+      `maxVotesPerCandidate (${maxVotesPerCandidate}) cannot exceed maxVotesPerCategory (${maxVotesPerCategory}). A candidate belongs to one category; you cannot vote for it more times than the category allows.`,
     )
   }
 
