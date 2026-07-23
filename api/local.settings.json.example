@@ -3,7 +3,8 @@
   "Values": {
     "AzureWebJobsStorage": "UseDevelopmentStorage=true",
     "FUNCTIONS_WORKER_RUNTIME": "node",
-    "AZURE_STORAGE_CONNECTION_STRING": "<your-azure-storage-connection-string>"
+    "AZURE_STORAGE_CONNECTION_STRING": "<your-azure-storage-connection-string>",
+    "ADMIN_SECRET": "<your-admin-secret>"
   },
   "Host": {
     "CORS": "http://localhost:5173",

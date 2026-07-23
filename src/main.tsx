@@ -3,12 +3,14 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import './index.css'
 import { CampaignPage } from './pages/CampaignPage'
+import { AdminPage } from './pages/AdminPage'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
       <Routes>
         <Route path="/c/:campaignId" element={<CampaignPage />} />
+        <Route path="/admin" element={<AdminPage />} />
         <Route path="/" element={<Navigate to="/c/ninja-naming" replace />} />
       </Routes>
     </BrowserRouter>

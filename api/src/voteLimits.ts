@@ -5,6 +5,13 @@ export interface VoteRecord {
   suggestionId: string
 }
 
+export function filterVoteRecordsByActiveSuggestions(
+  votes: VoteRecord[],
+  activeSuggestionIds: Set<string>,
+): VoteRecord[] {
+  return votes.filter((vote) => activeSuggestionIds.has(vote.suggestionId))
+}
+
 export function canCastVote(
   campaign: CampaignConfig,
   votes: VoteRecord[],

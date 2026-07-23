@@ -18,6 +18,8 @@ export interface CampaignConfig {
   maxVotesPerCategory: number
   /** Maximum votes a user may cast for a single candidate (suggestion). 0 = unlimited. */
   maxVotesPerCandidate: number
+  /** Optional hero/banner image URL. */
+  bannerImageUrl?: string
 }
 
 /**

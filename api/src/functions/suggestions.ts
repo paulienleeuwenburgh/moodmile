@@ -20,12 +20,17 @@ async function getSuggestions(
 
   // Filter all partition keys that start with "{campaignId}|".
   // '~' (ASCII 126) is one above '|' (ASCII 124), giving a correct lexicographic upper bound.
-  const filter = campaignId
+  const partitionFilter = campaignId
     ? `PartitionKey ge '${escapeODataString(campaignId)}|' and PartitionKey lt '${escapeODataString(campaignId)}~'`
     : undefined
 
+  // Exclude soft-deleted suggestions. OData `ne true` also matches absent/null boolean fields,
+  // so this safely excludes deleted entries while including all rows that have never been deleted.
+  const deletedFilter = `isDeleted ne true`
+  const filter = partitionFilter ? `${partitionFilter} and ${deletedFilter}` : deletedFilter
+
   for await (const entity of client.listEntities<SuggestionEntity>({
-    queryOptions: filter ? { filter } : undefined,
+    queryOptions: { filter },
   })) {
     suggestions.push(entityToSuggestion(entity))
   }
@@ -85,6 +90,7 @@ async function postSuggestion(
     name,
     createdAt,
     votes: 0,
+    isDeleted: false,
   })
 
   return {
