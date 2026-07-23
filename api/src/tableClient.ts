@@ -62,25 +62,35 @@ export function votePartitionKey(campaignId: string, sessionId: string): string 
  * Campaign row in the 'campaigns' table.
  * partitionKey = 'campaign'  (constant – groups all campaigns in one partition)
  * rowKey       = campaignId  (e.g. 'ninja-naming')
+ *
+ * Image ownership: campaigns may own a bannerImageUrl (hero section).
  */
 export interface CampaignEntity {
   partitionKey: string
   rowKey: string       // campaignId
   title: string
   description: string
-  status: string       // e.g. 'active' | 'closed'
+  status: string       // 'draft' | 'active' | 'closed'
   allowSuggestions: boolean
   maxVotesTotal: number
   maxVotesPerCategory: number
   maxVotesPerCandidate: number
   createdAt: string
   updatedAt: string
+  /**
+   * Optional hero/banner image URL for the campaign.
+   * Supported schemes: https:// or a relative path starting with /.
+   * Set or update this field in Azure Table Storage to change the banner without redeployment.
+   */
+  bannerImageUrl?: string
 }
 
 /**
  * Question row in the 'questions' table.
  * partitionKey = campaignId  (e.g. 'ninja-naming')
  * rowKey       = questionId  (e.g. 'ninja-1')
+ *
+ * Image ownership: questions may own an imageUrl (category/question thumbnail).
  */
 export interface QuestionEntity {
   partitionKey: string // campaignId
@@ -113,6 +123,7 @@ export function entityToCampaignConfig(entity: TableEntityResult<CampaignEntity>
     maxVotesPerCandidate: entity.maxVotesPerCandidate,
     createdAt: entity.createdAt,
     updatedAt: entity.updatedAt,
+    bannerImageUrl: entity.bannerImageUrl,
   }
 }
 
@@ -131,6 +142,16 @@ export function entityToQuestion(entity: TableEntityResult<QuestionEntity>) {
 
 // ─── Suggestion / Vote entities ───────────────────────────────────────────────
 
+/**
+ * Suggestion (candidate) row in the 'suggestions' table.
+ * partitionKey = "{campaignId}|{questionId}"
+ * rowKey       = suggestionId (UUID)
+ *
+ * Image ownership: suggestions/candidates may own an imageUrl (candidate avatar).
+ * Soft-delete: set isDeleted = true to hide a candidate without losing vote history.
+ * Soft-deleted candidates are excluded from GET /api/suggestions results and from
+ * rankings. Restoring (isDeleted = false) allows voting again with vote history intact.
+ */
 export interface SuggestionEntity {
   partitionKey: string // "{campaignId}|{questionId}"
   rowKey: string       // suggestionId
@@ -139,6 +160,19 @@ export interface SuggestionEntity {
   name: string
   createdAt: string
   votes: number
+  /**
+   * Optional candidate image URL.
+   * Supported schemes: https:// or a relative path starting with /.
+   */
+  imageUrl?: string
+  /** Soft-delete flag. When true the candidate is hidden from all public views. */
+  isDeleted?: boolean
+  /** ISO timestamp of when the candidate was soft-deleted. */
+  deletedAt?: string
+  /** Identifier of the admin who performed the deletion (free-form string). */
+  deletedBy?: string
+  /** Optional reason supplied by the admin at time of deletion. */
+  deleteReason?: string
 }
 
 export interface VoteEntity {
@@ -169,5 +203,6 @@ export function entityToSuggestion(entity: TableEntityResult<SuggestionEntity>) 
     name: entity.name,
     createdAt: entity.createdAt,
     votes: entity.votes ?? 0,
+    imageUrl: entity.imageUrl,
   }
 }

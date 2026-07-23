@@ -12,7 +12,7 @@ import {
 } from '../tableClient'
 import { escapeODataString } from '../odata'
 import { getCampaign } from '../campaigns'
-import { canCastVote, type VoteRecord } from '../voteLimits'
+import { canCastVote, filterVoteRecordsByActiveSuggestions, type VoteRecord } from '../voteLimits'
 
 interface StoredVoteRecord extends VoteRecord {
   partitionKey: string
@@ -42,6 +42,28 @@ async function listVoteRecords(campaignId: string, sessionId: string): Promise<S
   return records
 }
 
+async function listActiveSuggestionIds(campaignId: string): Promise<Set<string>> {
+  const client = getSuggestionsClient()
+  const filter = `PartitionKey ge '${escapeODataString(campaignId)}|' and PartitionKey lt '${escapeODataString(campaignId)}~' and isDeleted ne true`
+  const suggestionIds = new Set<string>()
+
+  for await (const entity of client.listEntities<SuggestionEntity>({
+    queryOptions: { filter },
+  })) {
+    suggestionIds.add(String(entity.rowKey))
+  }
+
+  return suggestionIds
+}
+
+async function listActiveVoteRecords(campaignId: string, sessionId: string): Promise<StoredVoteRecord[]> {
+  const [voteRecords, activeSuggestionIds] = await Promise.all([
+    listVoteRecords(campaignId, sessionId),
+    listActiveSuggestionIds(campaignId),
+  ])
+  return filterVoteRecordsByActiveSuggestions(voteRecords, activeSuggestionIds) as StoredVoteRecord[]
+}
+
 async function getVotes(
   request: HttpRequest,
   _context: InvocationContext,
@@ -53,9 +75,10 @@ async function getVotes(
     return { status: 400, jsonBody: { error: 'campaignId and sessionId query parameters are required' } }
   }
 
-  const client = getVotesClient()
-  await ensureTableExists(client)
-  const voteRecords = await listVoteRecords(campaignId, sessionId)
+  const votesClient = getVotesClient()
+  const suggestionsClient = getSuggestionsClient()
+  await Promise.all([ensureTableExists(votesClient), ensureTableExists(suggestionsClient)])
+  const voteRecords = await listActiveVoteRecords(campaignId, sessionId)
 
   // Return vote counts per suggestion: { [suggestionId]: count }
   const counts: Record<string, number> = {}
@@ -103,17 +126,17 @@ async function postVote(
   const votePartKey = votePartitionKey(campaignId, sessionId)
   const suggestionPartKey = suggestionPartitionKey(campaignId, questionId)
 
-  const voteRecords = await listVoteRecords(campaignId, sessionId)
+  const voteRecords = await listActiveVoteRecords(campaignId, sessionId)
   const existingVote = voteRecords.find((vote) => vote.suggestionId === suggestionId)
   const alreadyVoted = Boolean(existingVote)
 
-  // Fetch suggestion entity
+  // Fetch suggestion entity (exclude soft-deleted candidates)
   let suggestionEntity: TableEntityResult<SuggestionEntity> | undefined
   try {
     let found = false
     for await (const entity of suggestionsClient.listEntities<SuggestionEntity>({
       queryOptions: {
-        filter: `PartitionKey eq '${escapeODataString(suggestionPartKey)}' and RowKey eq '${escapeODataString(suggestionId)}'`,
+        filter: `PartitionKey eq '${escapeODataString(suggestionPartKey)}' and RowKey eq '${escapeODataString(suggestionId)}' and isDeleted ne true`,
       },
     })) {
       suggestionEntity = entity

@@ -566,6 +566,171 @@ describe('vote limit enforcement', () => {
   })
 })
 
+describe('stale data refresh UX', () => {
+  it('refreshes the view, shows loading feedback, and reports success', async () => {
+    const staleSuggestion = { ...testSuggestion, votes: 1 }
+    let resolveSuggestions: ((value: Suggestion[]) => void) | undefined
+
+    mockFetchCampaign.mockResolvedValue(ninjaCampaign)
+    mockFetchQuestions.mockResolvedValue(ninjaQuestions)
+    mockFetchSuggestions
+      .mockResolvedValueOnce([staleSuggestion])
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveSuggestions = resolve
+          }),
+      )
+    mockFetchVoteCounts
+      .mockResolvedValueOnce(new Map([[staleSuggestion.id, 1]]))
+      .mockResolvedValueOnce(new Map())
+
+    render(<App campaignId="ninja-naming" />)
+    await screen.findAllByRole('button', { name: /remove vote for rocket/i })
+
+    await userEvent.click(screen.getByRole('button', { name: /refresh data/i }))
+
+    expect(await screen.findByRole('button', { name: /refreshing/i })).toBeDisabled()
+
+    resolveSuggestions?.([])
+
+    expect(await screen.findByText(/data updated successfully/i)).toBeInTheDocument()
+    expect(screen.getByText(/last updated:/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /remove vote for rocket/i })).not.toBeInTheDocument()
+  })
+
+  it('shows a friendly refresh prompt when a deleted candidate is acted on', async () => {
+    const deletedSuggestion = { ...testSuggestion, votes: 1 }
+
+    mockFetchCampaign.mockResolvedValue(ninjaCampaign)
+    mockFetchQuestions.mockResolvedValue(ninjaQuestions)
+    mockFetchSuggestions.mockResolvedValue([deletedSuggestion])
+    mockFetchVoteCounts.mockResolvedValue(new Map([[deletedSuggestion.id, 1]]))
+    mockPostVote.mockRejectedValue(new Error('Suggestion not found'))
+
+    render(<App campaignId="ninja-naming" />)
+    await screen.findAllByRole('button', { name: /remove vote for rocket/i })
+
+    await userEvent.click(screen.getAllByRole('button', { name: /remove vote for rocket/i })[0])
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      "This candidate no longer exists. Your data may be out of date. Please click 'Refresh Data' to retrieve the latest information.",
+    )
+    expect(screen.getByRole('button', { name: /refresh data/i })).toBeInTheDocument()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Vote budget after soft delete
+// ---------------------------------------------------------------------------
+
+describe('vote budget after soft delete', () => {
+  it('soft-deleted candidates release their votes back to the voter budget', async () => {
+    // Campaign allows 3 total votes, up to 2 per candidate.
+    const multiVoteCampaign: Campaign = {
+      ...ninjaCampaign,
+      maxVotesTotal: 3,
+      maxVotesPerCandidate: 2,
+      maxVotesPerCategory: 0,
+    }
+    const rogier: Suggestion = {
+      id: 'rogier',
+      campaignId: 'ninja-naming',
+      questionId: 'ninja-1',
+      name: 'Rogier',
+      createdAt: '2024-01-01T00:00:00.000Z',
+      votes: 1,
+    }
+    const voteCounts = new Map<string, number>([['rogier', 1]])
+    mockFetchCampaign.mockResolvedValue(multiVoteCampaign)
+    mockFetchQuestions.mockResolvedValue(ninjaQuestions)
+    mockFetchSuggestions.mockResolvedValue([rogier])
+    mockFetchVoteCounts.mockResolvedValue(voteCounts)
+
+    render(<App campaignId="ninja-naming" />)
+    await screen.findAllByRole('button', { name: /vote for rogier/i })
+
+    // Marja is deleted, so only Rogier's active vote counts toward the visible budget.
+    expect(screen.getByRole('complementary', { name: /voting rules/i })).toHaveTextContent(
+      /2 of 3 total votes remaining/i,
+    )
+    expect(screen.getAllByRole('button', { name: /vote for rogier/i })[0]).not.toBeDisabled()
+  })
+
+  it('restoring a candidate makes its preserved votes count against the budget again', async () => {
+    const multiVoteCampaign: Campaign = {
+      ...ninjaCampaign,
+      maxVotesTotal: 3,
+      maxVotesPerCandidate: 2,
+      maxVotesPerCategory: 0,
+    }
+    const marja: Suggestion = {
+      id: 'marja',
+      campaignId: 'ninja-naming',
+      questionId: 'ninja-1',
+      name: 'Marja',
+      createdAt: '2024-01-01T00:00:00.000Z',
+      votes: 2,
+    }
+    const rogier: Suggestion = {
+      id: 'rogier',
+      campaignId: 'ninja-naming',
+      questionId: 'ninja-1',
+      name: 'Rogier',
+      createdAt: '2024-01-02T00:00:00.000Z',
+      votes: 1,
+    }
+    const voteCounts = new Map<string, number>([
+      ['marja', 2],
+      ['rogier', 1],
+    ])
+    mockFetchCampaign.mockResolvedValue(multiVoteCampaign)
+    mockFetchQuestions.mockResolvedValue(ninjaQuestions)
+    mockFetchSuggestions.mockResolvedValue([marja, rogier])
+    mockFetchVoteCounts.mockResolvedValue(voteCounts)
+
+    render(<App campaignId="ninja-naming" />)
+    await screen.findAllByRole('button', { name: /vote for rogier/i })
+
+    expect(screen.getByRole('complementary', { name: /voting rules/i })).toHaveTextContent(
+      /0 of 3 total votes remaining/i,
+    )
+    expect(screen.getAllByRole('button', { name: /vote for rogier/i })[0]).toBeDisabled()
+  })
+
+  it('vote budget is unaffected when a candidate with zero votes is deleted', async () => {
+    const multiVoteCampaign: Campaign = {
+      ...ninjaCampaign,
+      maxVotesTotal: 3,
+      maxVotesPerCandidate: 2,
+      maxVotesPerCategory: 0,
+    }
+    const rogier: Suggestion = {
+      id: 'rogier',
+      campaignId: 'ninja-naming',
+      questionId: 'ninja-1',
+      name: 'Rogier',
+      createdAt: '2024-01-01T00:00:00.000Z',
+      votes: 1,
+    }
+    // Marta had 0 votes and was deleted — voteCountById has no entry for her.
+    const voteCounts = new Map<string, number>([['rogier', 1]])
+    mockFetchCampaign.mockResolvedValue(multiVoteCampaign)
+    mockFetchQuestions.mockResolvedValue(ninjaQuestions)
+    mockFetchSuggestions.mockResolvedValue([rogier])
+    mockFetchVoteCounts.mockResolvedValue(voteCounts)
+
+    render(<App campaignId="ninja-naming" />)
+    await screen.findAllByRole('button', { name: /vote for rogier/i })
+
+    // Only 1 of 3 votes used — 2 remaining.
+    expect(screen.getByRole('complementary', { name: /voting rules/i })).toHaveTextContent(
+      /2 of 3 total votes remaining/i,
+    )
+    expect(screen.getAllByRole('button', { name: /vote for rogier/i })[0]).not.toBeDisabled()
+  })
+})
+
 // ---------------------------------------------------------------------------
 // Campaign and questions loaded from storage
 // ---------------------------------------------------------------------------

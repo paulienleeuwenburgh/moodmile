@@ -12,6 +12,12 @@ export interface Campaign {
   maxVotesPerCategory: number
   /** Maximum votes a user may cast for a single candidate (suggestion). 0 = unlimited. */
   maxVotesPerCandidate: number
+  /**
+   * Optional banner image URL for the campaign hero section.
+   * Supported schemes: https:// or a relative path starting with /.
+   * Can be set in Azure Table Storage without redeployment.
+   */
+  bannerImageUrl?: string
 }
 
 export interface Question {
@@ -32,6 +38,12 @@ export interface Suggestion {
   name: string
   createdAt: string
   votes: number
+  /**
+   * Optional candidate image URL.
+   * Supported schemes: https:// or a relative path starting with /.
+   * Can be set in Azure Table Storage without redeployment.
+   */
+  imageUrl?: string
 }
 
 export interface Vote {
