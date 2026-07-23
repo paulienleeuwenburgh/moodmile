@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import './App.css'
 import { Leaderboard } from './components/Leaderboard'
 import { QuestionCard } from './components/QuestionCard'
@@ -15,6 +15,16 @@ interface AppProps {
   campaignId: string
 }
 
+const STALE_DATA_MESSAGE =
+  "This candidate no longer exists. Your data may be out of date. Please click 'Refresh Data' to retrieve the latest information."
+
+function formatLastUpdated(timestamp: string): string {
+  return new Intl.DateTimeFormat(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(timestamp))
+}
+
 function App({ campaignId }: AppProps) {
   const [campaign, setCampaign] = useState<Campaign | null>(null)
   const [campaignNotFound, setCampaignNotFound] = useState(false)
@@ -23,38 +33,63 @@ function App({ campaignId }: AppProps) {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const [voteCountById, setVoteCountById] = useState<Map<string, number>>(new Map())
   const [actionError, setActionError] = useState<string | null>(null)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [refreshSuccessMessage, setRefreshSuccessMessage] = useState('')
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null)
 
   const voteRecords = getClientVoteRecords(suggestions, voteCountById)
 
-  useEffect(() => {
+  const refreshData = useCallback(async ({ manual = false }: { manual?: boolean } = {}) => {
     const sessionId = getSessionId()
-    fetchCampaign(campaignId)
-      .then((loadedCampaign) =>
-        Promise.all([
-          Promise.resolve(loadedCampaign),
-          fetchQuestions(campaignId),
-          fetchSuggestions(campaignId),
-          fetchVoteCounts(campaignId, sessionId),
-        ]),
+    if (manual) {
+      setIsRefreshing(true)
+      setRefreshSuccessMessage('')
+    }
+    setCampaignNotFound(false)
+
+    try {
+      const loadedCampaign = await fetchCampaign(campaignId)
+      const [loadedQuestions, loadedSuggestions, loadedVoteCounts] = await Promise.all([
+        fetchQuestions(campaignId),
+        fetchSuggestions(campaignId),
+        fetchVoteCounts(campaignId, sessionId),
+      ])
+
+      setCampaign(loadedCampaign)
+      setQuestions(loadedQuestions)
+      setSelectedQuestionId((current) =>
+        current && loadedQuestions.some((question) => question.id === current)
+          ? current
+          : (loadedQuestions[0]?.id ?? ''),
       )
-      .then(([loadedCampaign, loadedQuestions, loadedSuggestions, loadedVoteCounts]) => {
-        setCampaign(loadedCampaign)
-        setQuestions(loadedQuestions)
-        if (loadedQuestions.length > 0) {
-          setSelectedQuestionId(loadedQuestions[0].id)
-        }
-        setSuggestions(loadedSuggestions)
-        setVoteCountById(loadedVoteCounts)
-      })
-      .catch((err: unknown) => {
-        const isNotFound =
-          err instanceof Error && err.message.includes('Campaign not found')
-        if (isNotFound) {
-          setCampaignNotFound(true)
-        }
-        // Other errors: app stays in loading state with empty data
-      })
+      setSuggestions(loadedSuggestions)
+      setVoteCountById(loadedVoteCounts)
+      setLastUpdatedAt(new Date().toISOString())
+
+      if (manual) {
+        setActionError(null)
+        setRefreshSuccessMessage('Data updated successfully')
+        setTimeout(() => setRefreshSuccessMessage(''), 4000)
+      }
+    } catch (err: unknown) {
+      const isNotFound = err instanceof Error && err.message.includes('Campaign not found')
+      if (isNotFound) {
+        setCampaignNotFound(true)
+      }
+      if (manual) {
+        setActionError('Could not refresh data. Please try again.')
+      }
+      // Other errors: app stays in loading state with empty data
+    } finally {
+      if (manual) {
+        setIsRefreshing(false)
+      }
+    }
   }, [campaignId])
+
+  useEffect(() => {
+    void refreshData()
+  }, [refreshData])
 
   const handleSuggestionSubmit = (name: string) => {
     if (!selectedQuestionId || !campaign) {
@@ -112,13 +147,23 @@ function App({ campaignId }: AppProps) {
       return
     }
 
-    const updated = await postVote(
-      currentCampaign.id,
-      suggestion.questionId,
-      suggestionId,
-      sessionId,
-      revoke,
-    )
+    let updated: Suggestion | null
+    try {
+      updated = await postVote(
+        currentCampaign.id,
+        suggestion.questionId,
+        suggestionId,
+        sessionId,
+        revoke,
+      )
+    } catch (err) {
+      if (err instanceof Error && err.message.includes('Suggestion not found')) {
+        setActionError(STALE_DATA_MESSAGE)
+        return
+      }
+      setActionError('Vote could not be saved. Please try again.')
+      return
+    }
 
     if (!updated) {
       setActionError('Vote could not be saved. Please try again.')
@@ -194,6 +239,36 @@ function App({ campaignId }: AppProps) {
             onError={handleImageError}
           />
         )}
+      </section>
+
+      <section className="data-refresh" aria-label="Data refresh" aria-busy={isRefreshing}>
+        <div className="data-refresh__content">
+          <h2>Need the latest changes?</h2>
+          <p>
+            Admins and other users can update this campaign while you have this page open. Use
+            Refresh Data to sync your view before voting or withdrawing a vote.
+          </p>
+          <div className="data-refresh__meta">
+            {lastUpdatedAt && (
+              <span className="data-refresh__timestamp">
+                Last updated: {formatLastUpdated(lastUpdatedAt)}
+              </span>
+            )}
+            {refreshSuccessMessage && (
+              <span className="data-refresh__success" role="status">
+                {refreshSuccessMessage}
+              </span>
+            )}
+          </div>
+        </div>
+        <button
+          type="button"
+          className="data-refresh__button"
+          onClick={() => void refreshData({ manual: true })}
+          disabled={isRefreshing}
+        >
+          {isRefreshing ? 'Refreshing…' : 'Refresh Data'}
+        </button>
       </section>
 
       {actionError && (

@@ -60,15 +60,11 @@ export async function postVote(
   sessionId: string,
   revoke: boolean,
 ): Promise<Suggestion | null> {
-  try {
-    return await apiFetch<Suggestion>('/votes', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ campaignId, questionId, suggestionId, sessionId, revoke }),
-    })
-  } catch {
-    return null
-  }
+  return apiFetch<Suggestion>('/votes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ campaignId, questionId, suggestionId, sessionId, revoke }),
+  })
 }
 
 // ─── Admin API ────────────────────────────────────────────────────────────────
@@ -135,4 +131,3 @@ export async function fetchDeletedSuggestions(
     { headers: { 'X-Admin-Secret': adminSecret } },
   )
 }
-

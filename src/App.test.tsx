@@ -566,6 +566,60 @@ describe('vote limit enforcement', () => {
   })
 })
 
+describe('stale data refresh UX', () => {
+  it('refreshes the view, shows loading feedback, and reports success', async () => {
+    const staleSuggestion = { ...testSuggestion, votes: 1 }
+    let resolveSuggestions: ((value: Suggestion[]) => void) | undefined
+
+    mockFetchCampaign.mockResolvedValue(ninjaCampaign)
+    mockFetchQuestions.mockResolvedValue(ninjaQuestions)
+    mockFetchSuggestions
+      .mockResolvedValueOnce([staleSuggestion])
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveSuggestions = resolve
+          }),
+      )
+    mockFetchVoteCounts
+      .mockResolvedValueOnce(new Map([[staleSuggestion.id, 1]]))
+      .mockResolvedValueOnce(new Map())
+
+    render(<App campaignId="ninja-naming" />)
+    await screen.findAllByRole('button', { name: /remove vote for rocket/i })
+
+    await userEvent.click(screen.getByRole('button', { name: /refresh data/i }))
+
+    expect(await screen.findByRole('button', { name: /refreshing/i })).toBeDisabled()
+
+    resolveSuggestions?.([])
+
+    expect(await screen.findByText(/data updated successfully/i)).toBeInTheDocument()
+    expect(screen.getByText(/last updated:/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /remove vote for rocket/i })).not.toBeInTheDocument()
+  })
+
+  it('shows a friendly refresh prompt when a deleted candidate is acted on', async () => {
+    const deletedSuggestion = { ...testSuggestion, votes: 1 }
+
+    mockFetchCampaign.mockResolvedValue(ninjaCampaign)
+    mockFetchQuestions.mockResolvedValue(ninjaQuestions)
+    mockFetchSuggestions.mockResolvedValue([deletedSuggestion])
+    mockFetchVoteCounts.mockResolvedValue(new Map([[deletedSuggestion.id, 1]]))
+    mockPostVote.mockRejectedValue(new Error('Suggestion not found'))
+
+    render(<App campaignId="ninja-naming" />)
+    await screen.findAllByRole('button', { name: /remove vote for rocket/i })
+
+    await userEvent.click(screen.getAllByRole('button', { name: /remove vote for rocket/i })[0])
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      "This candidate no longer exists. Your data may be out of date. Please click 'Refresh Data' to retrieve the latest information.",
+    )
+    expect(screen.getByRole('button', { name: /refresh data/i })).toBeInTheDocument()
+  })
+})
+
 // ---------------------------------------------------------------------------
 // Vote budget after soft delete
 // ---------------------------------------------------------------------------
