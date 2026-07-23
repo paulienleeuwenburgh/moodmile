@@ -65,7 +65,7 @@ This gives the admin an at-a-glance picture of campaign state before taking any 
 
 - **Effect:** The candidate is hidden from the suggestion board and leaderboard. It no longer appears in voting.
 - **Votes:** Existing votes for this candidate are **preserved** in storage. The vote count remains on the candidate row for audit purposes.
-- **Vote budget:** Votes already cast for a deleted candidate **count against** the voter's remaining budget. This prevents users from gaining extra votes by having their preferred candidate deleted.
+- **Vote budget:** While the candidate remains deleted, votes previously cast for it **do not count against** the voter's remaining budget. The voter regains that budget immediately.
 - **Metadata fields stored:**
   - `isDeleted`: `true`
   - `deletedAt`: ISO timestamp
@@ -79,7 +79,7 @@ This gives the admin an at-a-glance picture of campaign state before taking any 
 - **Effect:** The candidate reappears in the suggestion board, leaderboard, and voting immediately.
 - **Votes:** The original vote count is restored intact.
 - **Voting:** Users can vote for or revoke votes on the candidate again as normal.
-- **Note:** Votes cast before deletion still count against users' budgets (they were never refunded), so a restored candidate may show existing votes from before it was deleted.
+- **Note:** Restoring a candidate re-activates its preserved votes immediately. Those votes count against users' budgets again, which may reduce a voter's remaining budget or leave them temporarily over budget until they revoke active votes.
 - **Confirmation dialog:** Shows candidate name, question, vote count that will be restored. Confirm button is green to signal this is a safe operation.
 
 ### Reset campaign votes
@@ -210,4 +210,3 @@ All admin routes require the `X-Admin-Secret: <secret>` header.
 | `404` | Campaign or suggestion not found |
 | `409` | Conflict (e.g. candidate already deleted, or no vote to revoke) |
 | `501` | `ADMIN_SECRET` not configured on the server |
-

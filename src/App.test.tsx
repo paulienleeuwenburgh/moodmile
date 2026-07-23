@@ -571,7 +571,7 @@ describe('vote limit enforcement', () => {
 // ---------------------------------------------------------------------------
 
 describe('vote budget after soft delete', () => {
-  it('votes for a soft-deleted candidate still count against the total budget', async () => {
+  it('soft-deleted candidates release their votes back to the voter budget', async () => {
     // Campaign allows 3 total votes, up to 2 per candidate.
     const multiVoteCampaign: Campaign = {
       ...ninjaCampaign,
@@ -587,12 +587,7 @@ describe('vote budget after soft delete', () => {
       createdAt: '2024-01-01T00:00:00.000Z',
       votes: 1,
     }
-    // Marja was soft-deleted — she is absent from suggestions but her 2 votes remain
-    // in the backend votes table, so the API returns them in voteCountById.
-    const voteCounts = new Map<string, number>([
-      ['marja', 2],    // deleted candidate — votes persist
-      ['rogier', 1],   // visible candidate
-    ])
+    const voteCounts = new Map<string, number>([['rogier', 1]])
     mockFetchCampaign.mockResolvedValue(multiVoteCampaign)
     mockFetchQuestions.mockResolvedValue(ninjaQuestions)
     mockFetchSuggestions.mockResolvedValue([rogier])
@@ -601,11 +596,51 @@ describe('vote budget after soft delete', () => {
     render(<App campaignId="ninja-naming" />)
     await screen.findAllByRole('button', { name: /vote for rogier/i })
 
-    // All 3 votes are spent (2 for Marja + 1 for Rogier) — budget must show 0 remaining.
+    // Marja is deleted, so only Rogier's active vote counts toward the visible budget.
+    expect(screen.getByRole('complementary', { name: /voting rules/i })).toHaveTextContent(
+      /2 of 3 total votes remaining/i,
+    )
+    expect(screen.getAllByRole('button', { name: /vote for rogier/i })[0]).not.toBeDisabled()
+  })
+
+  it('restoring a candidate makes its preserved votes count against the budget again', async () => {
+    const multiVoteCampaign: Campaign = {
+      ...ninjaCampaign,
+      maxVotesTotal: 3,
+      maxVotesPerCandidate: 2,
+      maxVotesPerCategory: 0,
+    }
+    const marja: Suggestion = {
+      id: 'marja',
+      campaignId: 'ninja-naming',
+      questionId: 'ninja-1',
+      name: 'Marja',
+      createdAt: '2024-01-01T00:00:00.000Z',
+      votes: 2,
+    }
+    const rogier: Suggestion = {
+      id: 'rogier',
+      campaignId: 'ninja-naming',
+      questionId: 'ninja-1',
+      name: 'Rogier',
+      createdAt: '2024-01-02T00:00:00.000Z',
+      votes: 1,
+    }
+    const voteCounts = new Map<string, number>([
+      ['marja', 2],
+      ['rogier', 1],
+    ])
+    mockFetchCampaign.mockResolvedValue(multiVoteCampaign)
+    mockFetchQuestions.mockResolvedValue(ninjaQuestions)
+    mockFetchSuggestions.mockResolvedValue([marja, rogier])
+    mockFetchVoteCounts.mockResolvedValue(voteCounts)
+
+    render(<App campaignId="ninja-naming" />)
+    await screen.findAllByRole('button', { name: /vote for rogier/i })
+
     expect(screen.getByRole('complementary', { name: /voting rules/i })).toHaveTextContent(
       /0 of 3 total votes remaining/i,
     )
-    // The vote button for Rogier must be disabled because the total budget is exhausted.
     expect(screen.getAllByRole('button', { name: /vote for rogier/i })[0]).toBeDisabled()
   })
 

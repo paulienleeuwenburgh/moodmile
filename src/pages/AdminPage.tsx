@@ -158,7 +158,7 @@ export function AdminPage() {
     const questionTitle = questionById[suggestion.questionId]?.title ?? suggestion.questionId
     ask({
       title: 'Delete candidate',
-      message: `Delete "${suggestion.name}" from "${questionTitle}"?\n\nThe candidate will be immediately hidden from voting and rankings. Existing votes (${suggestion.votes}) are preserved and still count against voters' budgets. You can restore this candidate at any time.`,
+      message: `Delete "${suggestion.name}" from "${questionTitle}"?\n\nThe candidate will be immediately hidden from voting and rankings. Existing votes (${suggestion.votes}) are preserved for audit, and the affected voters regain that budget while the candidate remains deleted. Restoring the candidate makes those preserved votes count again.`,
       confirmLabel: 'Delete candidate',
       onConfirm: async () => {
         setConfirm(null)
@@ -479,7 +479,8 @@ export function AdminPage() {
             <p className="admin-section__description">
               Soft-deleted candidates are hidden from voters but preserved for audit.
               Restoring a candidate makes it immediately visible to voters with its original vote count intact.
-              Votes previously cast for deleted candidates still count against voters&apos; remaining budgets.
+              While a candidate is deleted, its preserved votes do not count against voters&apos; remaining budgets.
+              Restoring it makes those preserved votes active again immediately.
             </p>
             {deletedSuggestions.length === 0 ? (
               <p className="admin-empty">No deleted candidates.</p>

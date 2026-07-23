@@ -58,23 +58,31 @@ describe('getClientVoteRecords', () => {
     expect(records.find((r) => r.suggestionId === 'rogier')?.questionId).toBe('q-1')
   })
 
-  it('includes votes for soft-deleted candidates absent from suggestions', () => {
-    // Marja has been soft-deleted — no longer in suggestions, but her votes remain.
+  it('excludes votes for soft-deleted candidates absent from suggestions', () => {
     const counts = new Map([
       ['marja', 2],
       ['rogier', 1],
     ])
     const records = getClientVoteRecords([rogier], counts)
-    expect(records).toHaveLength(3)
-    expect(records.filter((r) => r.suggestionId === 'marja')).toHaveLength(2)
+    expect(records).toHaveLength(1)
+    expect(records.filter((r) => r.suggestionId === 'marja')).toHaveLength(0)
     expect(records.filter((r) => r.suggestionId === 'rogier')).toHaveLength(1)
   })
 
-  it('uses empty string as questionId for soft-deleted candidates', () => {
+  it('returns no records when only soft-deleted candidates have votes', () => {
     const counts = new Map([['marja', 2]])
     const records = getClientVoteRecords([], counts)
-    expect(records).toHaveLength(2)
-    expect(records.every((r) => r.questionId === '')).toBe(true)
+    expect(records).toEqual([])
+  })
+
+  it('counts preserved votes again when a candidate is restored to suggestions', () => {
+    const counts = new Map([
+      ['marja', 2],
+      ['rogier', 1],
+    ])
+    const records = getClientVoteRecords([marja, rogier], counts)
+    expect(records).toHaveLength(3)
+    expect(records.filter((r) => r.suggestionId === 'marja')).toHaveLength(2)
   })
 
   it('preserves questionId for visible candidates', () => {
@@ -99,19 +107,27 @@ describe('getRemainingVotesTotal', () => {
     expect(getRemainingVotesTotal(baseCampaign, [])).toBe(3)
   })
 
-  it('accounts for votes including those for deleted candidates', () => {
+  it('releases votes for soft-deleted candidates from the total budget', () => {
     const counts = new Map([
       ['marja', 2],
       ['rogier', 1],
     ])
-    // Marja is deleted; only Rogier is in suggestions
     const records = getClientVoteRecords([rogier], counts)
+    expect(getRemainingVotesTotal(baseCampaign, records)).toBe(2)
+  })
+
+  it('counts preserved votes again after a candidate is restored', () => {
+    const counts = new Map([
+      ['marja', 2],
+      ['rogier', 1],
+    ])
+    const records = getClientVoteRecords([marja, rogier], counts)
     expect(getRemainingVotesTotal(baseCampaign, records)).toBe(0)
   })
 
-  it('never returns a negative number', () => {
-    const counts = new Map([['marja', 5]])
-    const records = getClientVoteRecords([], counts)
+  it('never returns a negative number when active visible votes exceed the budget', () => {
+    const counts = new Map([['rogier', 5]])
+    const records = getClientVoteRecords([rogier], counts)
     expect(getRemainingVotesTotal(baseCampaign, records)).toBe(0)
   })
 })
@@ -136,13 +152,21 @@ describe('canCastVote – total limit', () => {
     expect(canCastVote(baseCampaign, records, 'q-1', 'rogier')).toBe(false)
   })
 
-  it('blocks a vote when total budget is exhausted by votes including deleted candidates', () => {
-    // Marja soft-deleted; Rogier visible. 2 + 1 = 3 = maxVotesTotal.
+  it('allows a vote when deleted candidates have released their preserved votes', () => {
     const counts = new Map([
       ['marja', 2],
       ['rogier', 1],
     ])
     const records = getClientVoteRecords([rogier], counts)
+    expect(canCastVote(baseCampaign, records, 'q-1', 'rogier')).toBe(true)
+  })
+
+  it('blocks a vote again after the deleted candidate is restored', () => {
+    const counts = new Map([
+      ['marja', 2],
+      ['rogier', 1],
+    ])
+    const records = getClientVoteRecords([marja, rogier], counts)
     expect(canCastVote(baseCampaign, records, 'q-1', 'rogier')).toBe(false)
   })
 })

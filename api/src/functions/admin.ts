@@ -24,13 +24,15 @@
  *     Soft-deletes a candidate. The suggestion row is kept; isDeleted is set to true.
  *     Existing vote rows are preserved — vote history remains explainable.
  *     The candidate no longer appears in GET /api/suggestions or rankings.
- *     Votes already cast for the candidate are NOT refunded to users' budgets.
+ *     While the candidate is deleted, its preserved votes no longer count against users'
+ *     vote budgets. Restoring the candidate makes those preserved votes active again.
  *
  *   POST /api/mgmt/suggestions/restore
  *     Body: { campaignId, questionId, suggestionId }
  *     Restores a soft-deleted candidate. Sets isDeleted = false and clears delete metadata.
  *     The candidate reappears with its original vote count intact.
- *     Voting resumes as normal; users who voted before deletion can vote again (or revoke).
+ *     Voting resumes as normal. The preserved votes count against voters again immediately,
+ *     which may reduce their remaining budget or leave them temporarily over budget until revoke.
  *
  *   DELETE /api/mgmt/campaigns/{campaignId}/votes
  *     Removes all vote rows for the campaign and resets every suggestion's vote counter to 0.
