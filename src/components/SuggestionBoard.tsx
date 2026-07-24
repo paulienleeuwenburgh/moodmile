@@ -22,6 +22,7 @@ export function SuggestionBoard({
 
   return (
     <section className="suggestion-board" aria-label="Suggestions by question">
+      <span className="section-eyebrow" aria-hidden="true">Candidates</span>
       <h2>Suggestions by question</h2>
       <div className="suggestion-board__grid">
         {questions.map((question) => {
@@ -43,7 +44,16 @@ export function SuggestionBoard({
                 <h3>{question.title}</h3>
               </header>
               {questionSuggestions.length === 0 ? (
-                <p className="suggestion-group__empty">No suggestions yet — be the first!</p>
+                <p className="suggestion-group__empty">
+                  {/* Empty inbox icon */}
+                  <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" width="14" height="14" style={{ flexShrink: 0 }}>
+                    <rect x="1.5" y="5.5" width="13" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.25" />
+                    <path d="M1.5 9.5h3.25L6 11.5h4l1.25-2H14.5" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M5.5 3L8 1l2.5 2" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M8 1v5" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
+                  </svg>
+                  No suggestions yet — be the first!
+                </p>
               ) : (
                 <ul>
                   {questionSuggestions.map((suggestion) => {
