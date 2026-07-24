@@ -4,6 +4,27 @@ Images in this platform are stored as URL strings in Azure Table Storage. No cod
 
 ---
 
+## Recommended source sizes
+
+Use high-resolution source images so they stay sharp on large screens and in the lightbox.
+
+| Image type | Recommended size | Preferred aspect ratio | Rendering behaviour |
+|---|---|---|---|
+| **Campaign banner** | `1600 × 900` px | `16:9` | Rendered as a wide hero image with `cover` cropping |
+| **Question image** | `1600 × 900` px | `16:9` | Rendered prominently on the question card; lightbox shows the full image |
+| **Square question image** | `1200 × 1200` px | `1:1` | Rendered in a slightly taller card preview with center-crop |
+| **Portrait question image** | `1200 × 1500` px | `4:5` | Rendered in a portrait-friendly preview with full-image containment |
+
+### Aspect-ratio guidance
+
+- **Landscape (`16:9` preferred):** Best default for both campaign banners and question images.
+- **Square (`1:1`):** Supported. The question card uses a slightly taller preview so the image still feels substantial.
+- **Portrait (`4:5` recommended):** Supported. The card preserves the full image without distortion; the lightbox remains available for a larger view.
+
+> Avoid uploading very small raster images (for example `200 × 120` px). They can still be displayed, but they may look soft when scaled up for modern screens.
+
+---
+
 ## Which entities can own images
 
 | Entity | Field | Where it renders |
@@ -89,6 +110,23 @@ The API does not need the Azure Blob SDK. Images are served directly to browsers
 | Scenario | Behaviour |
 |---|---|
 | `bannerImageUrl` absent or empty | Hero section renders without a banner image |
-| Question `imageUrl` absent | Question card renders without a thumbnail |
+| Question `imageUrl` absent | Question card renders without an image preview |
 | Candidate `imageUrl` absent | Candidate row renders without an avatar |
 | Invalid URL scheme | Image field is rejected at campaign creation/update time with a validation error |
+
+---
+
+## Frontend presentation behaviour
+
+### Campaign banners
+
+- Banners are presented as wide hero media.
+- The hero preview uses `cover`, so `16:9` images produce the most predictable result.
+- Extremely tall or narrow banners may be center-cropped in the hero.
+
+### Question images
+
+- Question cards use larger, campaign-style previews instead of small thumbnails.
+- **Landscape and square** images fill the available card space with `cover` cropping.
+- **Portrait** images are shown with `contain` so the full image remains visible.
+- Clicking the expand button opens the lightbox, which always uses `contain` so the original image is shown without distortion.

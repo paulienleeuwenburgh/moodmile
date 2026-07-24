@@ -24,7 +24,7 @@ export function ImageLightbox({ src, alt, onClose }: ImageLightboxProps) {
       aria-label={`Enlarged image: ${alt}`}
     >
       <div className="lightbox-content" onClick={(e) => e.stopPropagation()}>
-        <img src={src} alt={alt} className="lightbox-img" />
+        <img src={src} alt={alt} className="lightbox-img" loading="eager" />
         <button
           type="button"
           className="lightbox-close"
