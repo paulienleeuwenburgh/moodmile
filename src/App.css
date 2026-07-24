@@ -402,6 +402,7 @@
 
 .question-card__image--portrait {
   object-fit: contain;
+  /* Portrait images keep breathing room so the full subject remains visible. */
   padding: 1rem;
 }
 

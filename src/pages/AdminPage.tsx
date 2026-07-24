@@ -81,7 +81,6 @@ export function AdminPage() {
   const questionById = Object.fromEntries(questions.map((q) => [q.id, q]))
   const totalVotes = [...suggestions, ...deletedSuggestions].reduce((sum, s) => sum + s.votes, 0)
   const canConfirm = !confirm?.confirmText || confirmInputValue === confirm.confirmText
-
   useDocumentTitle(campaign ? `MoodMile Admin | ${campaign.title}` : 'MoodMile Admin')
 
   function showSuccess(msg: string) {
