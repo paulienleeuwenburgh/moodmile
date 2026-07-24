@@ -131,10 +131,10 @@ const threeSuggestions: Suggestion[] = [
 beforeEach(() => {
   vi.clearAllMocks()
   localStorage.clear()
- document.title = 'MoodMile'
- // Default API responses so tests that don't call setupApi() still render the full UI.
- mockFetchCampaign.mockResolvedValue(ninjaCampaign)
- mockFetchQuestions.mockResolvedValue(ninjaQuestions)
+  document.title = 'MoodMile'
+  // Default API responses so tests that don't call setupApi() still render the full UI.
+  mockFetchCampaign.mockResolvedValue(ninjaCampaign)
+  mockFetchQuestions.mockResolvedValue(ninjaQuestions)
   mockFetchSuggestions.mockResolvedValue([])
   mockFetchVoteCounts.mockResolvedValue(new Map())
 })
