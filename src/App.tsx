@@ -224,7 +224,7 @@ function App({ campaignId }: AppProps) {
   if (campaignNotFound) {
     return (
       <main className="app-shell">
-        <section className={`hero${campaign.bannerImageUrl ? ' hero--with-banner' : ''}`}>
+        <section className="hero">
           <p className="hero__eyebrow">MOODMILE</p>
           <h1>Campaign not found</h1>
         </section>
