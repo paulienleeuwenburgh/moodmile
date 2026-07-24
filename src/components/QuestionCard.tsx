@@ -20,6 +20,7 @@ export function QuestionCard({ question, isSelected, onSelect }: QuestionCardPro
   function handleImageLoad(event: SyntheticEvent<HTMLImageElement>) {
     const { naturalWidth, naturalHeight } = event.currentTarget
     if (!naturalWidth || !naturalHeight) {
+      setImageVariant('landscape')
       return
     }
 

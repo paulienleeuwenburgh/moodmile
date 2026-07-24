@@ -82,7 +82,7 @@ function App({ campaignId }: AppProps) {
         setTimeout(() => setRefreshSuccessMessage(''), 4000)
       }
     } catch (err: unknown) {
-      const isNotFound = err instanceof ApiError ? err.status === 404 : err instanceof Error && err.message.includes('Campaign not found')
+      const isNotFound = err instanceof ApiError && err.status === 404
       if (isNotFound) {
         setCampaignNotFound(true)
       }
@@ -142,7 +142,7 @@ function App({ campaignId }: AppProps) {
       })
       .catch((err: unknown) => {
         setSuggestions((current) => current.filter((s) => s.id !== tempId))
-        if ((err instanceof ApiError && err.status === 403) || (err instanceof Error && err.message.includes('Suggestions are not allowed'))) {
+        if (err instanceof ApiError && err.status === 403) {
           setCampaign((current) => (current ? { ...current, allowSuggestions: false } : current))
           setActionError('Suggestions are closed for this campaign.')
           return
@@ -172,7 +172,7 @@ function App({ campaignId }: AppProps) {
         revoke,
       )
     } catch (err) {
-      if ((err instanceof ApiError && err.status === 404) || (err instanceof Error && err.message.includes('Suggestion not found'))) {
+      if (err instanceof ApiError && err.status === 404) {
         setActionError(STALE_DATA_MESSAGE)
         return
       }

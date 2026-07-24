@@ -117,6 +117,11 @@ function getVoteCount(): number {
   return parseInt(document.querySelector('.vote-btn__count')!.textContent ?? '0', 10)
 }
 
+async function createApiError(status: number, message: string) {
+  const { ApiError } = await import('./api')
+  return new ApiError(status, message)
+}
+
 const threeSuggestions: Suggestion[] = [
   { id: 'hanzo', campaignId: 'ninja-naming', questionId: 'ninja-1', name: 'Hanzo', createdAt: '2024-01-01T00:00:00.000Z', votes: 0 },
   { id: 'yuki', campaignId: 'ninja-naming', questionId: 'ninja-1', name: 'Yuki', createdAt: '2024-01-02T00:00:00.000Z', votes: 0 },
@@ -615,7 +620,7 @@ describe('stale data refresh UX', () => {
     mockFetchQuestions.mockResolvedValue(ninjaQuestions)
     mockFetchSuggestions.mockResolvedValue([deletedSuggestion])
     mockFetchVoteCounts.mockResolvedValue(new Map([[deletedSuggestion.id, 1]]))
-    mockPostVote.mockRejectedValue(new Error('Suggestion not found'))
+    mockPostVote.mockRejectedValue(await createApiError(404, 'Suggestion not found'))
 
     render(<App campaignId="ninja-naming" />)
     await screen.findAllByRole('button', { name: /remove vote for rocket/i })
@@ -896,7 +901,7 @@ describe('campaign routing', () => {
   })
 
   it('shows a campaign-not-found message for an unknown campaign', async () => {
-    mockFetchCampaign.mockRejectedValue(new Error('Campaign not found'))
+    mockFetchCampaign.mockRejectedValue(await createApiError(404, 'Campaign not found'))
     render(<App campaignId="does-not-exist" />)
     await screen.findByText('Campaign not found')
     expect(screen.getByText('Campaign not found')).toBeInTheDocument()

@@ -50,14 +50,8 @@ function getAdminErrorMessage(err: unknown, fallback = 'Operation failed.'): str
   }
   if (!(err instanceof Error)) return fallback
   const msg = err.message
-  if (msg === 'Unauthorized') {
-    return 'Invalid admin secret. Please check your credentials and try again.'
-  }
   if (msg.includes('not configured')) {
     return 'Admin access is not configured on this server. Contact your administrator.'
-  }
-  if (msg.includes('Campaign not found')) {
-    return 'Campaign not found. Please check the Campaign ID and try again.'
   }
   if (msg.startsWith('HTTP')) {
     return `API error: ${msg}. Please try again.`
