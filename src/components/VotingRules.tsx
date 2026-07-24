@@ -11,40 +11,47 @@ export function VotingRules({
   maxVotesPerCandidate,
   votesUsed,
 }: VotingRulesProps) {
-  const rules: string[] = []
+  const remaining = maxVotesTotal > 0 ? Math.max(0, maxVotesTotal - votesUsed) : null
 
+  const constraints: string[] = []
   if (maxVotesPerCandidate > 0) {
-    rules.push(
+    constraints.push(
       maxVotesPerCandidate === 1
         ? 'One vote per candidate'
         : `Up to ${maxVotesPerCandidate} votes per candidate`,
     )
   }
-
   if (maxVotesPerCategory > 0) {
-    rules.push(
+    constraints.push(
       maxVotesPerCategory === 1
         ? 'One vote per category'
         : `Up to ${maxVotesPerCategory} votes per category`,
     )
   }
 
-  if (maxVotesTotal > 0) {
-    const remaining = Math.max(0, maxVotesTotal - votesUsed)
-    rules.push(`${remaining} of ${maxVotesTotal} total vote${maxVotesTotal !== 1 ? 's' : ''} remaining`)
-  }
-
-  if (rules.length === 0) return null
+  if (remaining === null && constraints.length === 0) return null
 
   return (
     <aside className="voting-rules" aria-label="Voting rules">
-      <ul className="voting-rules__list">
-        {rules.map((rule) => (
-          <li key={rule} className="voting-rules__item">
-            {rule}
-          </li>
-        ))}
-      </ul>
+      {remaining !== null && (
+        <div className="voting-rules__remaining">
+          <span className="voting-rules__remaining-count">
+            {remaining}
+          </span>
+          <span className="voting-rules__remaining-label" aria-hidden="true">
+            {' '}of {maxVotesTotal} total vote{maxVotesTotal !== 1 ? 's' : ''} remaining
+          </span>
+        </div>
+      )}
+      {constraints.length > 0 && (
+        <ul className="voting-rules__list">
+          {constraints.map((rule) => (
+            <li key={rule} className="voting-rules__item">
+              {rule}
+            </li>
+          ))}
+        </ul>
+      )}
     </aside>
   )
 }
