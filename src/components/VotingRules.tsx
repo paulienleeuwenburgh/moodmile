@@ -35,7 +35,7 @@ export function VotingRules({
     <aside className="voting-rules" aria-label="Voting rules">
       {remaining !== null && (
         <div className="voting-rules__remaining">
-          <span className="voting-rules__remaining-count" aria-label={`${remaining} of ${maxVotesTotal} total vote${maxVotesTotal !== 1 ? 's' : ''} remaining`}>
+          <span className="voting-rules__remaining-count">
             {remaining}
           </span>
           <span className="voting-rules__remaining-label" aria-hidden="true">
