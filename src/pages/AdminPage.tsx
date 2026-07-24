@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { Campaign, Question, Suggestion } from '../types'
 import { Footer } from '../components/Footer'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
+import { ApiError } from '../api'
 import {
   fetchCampaign,
   fetchQuestions,
@@ -36,6 +37,17 @@ interface ConfirmDialog {
  * The API throws Error instances with message = the server's error field, or "HTTP {status}".
  */
 function getAdminErrorMessage(err: unknown, fallback = 'Operation failed.'): string {
+  if (err instanceof ApiError) {
+    if (err.status === 401) {
+      return 'Invalid admin secret. Please check your credentials and try again.'
+    }
+    if (err.status === 404) {
+      return 'Campaign not found. Please check the Campaign ID and try again.'
+    }
+    if (err.status >= 500) {
+      return 'Unexpected server error. Please try again later.'
+    }
+  }
   if (!(err instanceof Error)) return fallback
   const msg = err.message
   if (msg === 'Unauthorized') {
@@ -46,9 +58,6 @@ function getAdminErrorMessage(err: unknown, fallback = 'Operation failed.'): str
   }
   if (msg.includes('Campaign not found')) {
     return 'Campaign not found. Please check the Campaign ID and try again.'
-  }
-  if (msg.startsWith('HTTP 5')) {
-    return 'Unexpected server error. Please try again later.'
   }
   if (msg.startsWith('HTTP')) {
     return `API error: ${msg}. Please try again.`

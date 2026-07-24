@@ -59,12 +59,12 @@
   overflow: hidden;
   color: #ffffff;
   box-shadow: 0 8px 32px rgba(22, 9, 46, 0.32);
-  display: grid;
-  gap: 1.5rem;
-  align-items: center;
 }
 
 .hero--with-banner {
+  display: grid;
+  gap: 1.5rem;
+  align-items: center;
   grid-template-columns: minmax(0, 1.35fr) minmax(260px, 360px);
 }
 
@@ -503,8 +503,8 @@
 
 .lightbox-content {
   position: relative;
-  max-width: min(1100px, 92vw);
-  max-height: 92vh;
+  max-width: min(960px, 92vw);
+  max-height: 90vh;
   cursor: default;
   background: rgba(17, 24, 39, 0.92);
   border-radius: var(--radius-card);
@@ -523,7 +523,7 @@
 
 .lightbox-img {
   max-width: 100%;
-  max-height: calc(92vh - 2rem);
+  max-height: calc(90vh - 2rem);
   object-fit: contain;
   border-radius: var(--radius-sm);
   display: block;

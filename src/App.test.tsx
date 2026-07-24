@@ -17,6 +17,14 @@ const mockPostVote = vi.fn<
 >()
 
 vi.mock('./api', () => ({
+  ApiError: class ApiError extends Error {
+    status: number
+
+    constructor(status: number, message: string) {
+      super(message)
+      this.status = status
+    }
+  },
   fetchCampaign: (...args: Parameters<typeof mockFetchCampaign>) => mockFetchCampaign(...args),
   fetchQuestions: (...args: Parameters<typeof mockFetchQuestions>) => mockFetchQuestions(...args),
   fetchSuggestions: (...args: Parameters<typeof mockFetchSuggestions>) =>

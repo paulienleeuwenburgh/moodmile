@@ -10,6 +10,9 @@ interface QuestionCardProps {
   onSelect: (questionId: string) => void
 }
 
+const PORTRAIT_RATIO_THRESHOLD = 0.9
+const SQUARE_RATIO_THRESHOLD = 1.15
+
 export function QuestionCard({ question, isSelected, onSelect }: QuestionCardProps) {
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [imageVariant, setImageVariant] = useState<'landscape' | 'portrait' | 'square'>('landscape')
@@ -21,11 +24,11 @@ export function QuestionCard({ question, isSelected, onSelect }: QuestionCardPro
     }
 
     const ratio = naturalWidth / naturalHeight
-    if (ratio < 0.9) {
+    if (ratio < PORTRAIT_RATIO_THRESHOLD) {
       setImageVariant('portrait')
       return
     }
-    if (ratio <= 1.15) {
+    if (ratio <= SQUARE_RATIO_THRESHOLD) {
       setImageVariant('square')
       return
     }
