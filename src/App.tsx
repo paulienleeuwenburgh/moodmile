@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import './App.css'
+import { Footer } from './components/Footer'
 import { Leaderboard } from './components/Leaderboard'
 import { QuestionCard } from './components/QuestionCard'
 import { SuggestionBoard } from './components/SuggestionBoard'
@@ -212,14 +213,32 @@ function App({ campaignId }: AppProps) {
         <section className="hero">
           <p className="hero__eyebrow">MOODMILE</p>
           <h1>Campaign not found</h1>
-          <p>The campaign you are looking for does not exist or is no longer available.</p>
         </section>
+        <div className="empty-state">
+          {/* Search / not-found icon */}
+          <svg className="empty-state__icon" viewBox="0 0 48 48" fill="none" aria-hidden="true" width="56" height="56">
+            <circle cx="21" cy="21" r="13" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+            <path d="M30 30l9 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+            <path d="M17 21h8M21 17v8" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" opacity=".5" />
+          </svg>
+          <p className="empty-state__desc">
+            The campaign you are looking for does not exist or is no longer available.
+          </p>
+        </div>
+        <Footer />
       </main>
     )
   }
 
   if (!campaign) {
-    return null
+    return (
+      <main className="app-shell">
+        <div className="loading-state">
+          <div className="loading-spinner" role="progressbar" aria-label="Loading campaign…" />
+          <span className="loading-state__label">Loading campaign…</span>
+        </div>
+      </main>
+    )
   }
 
   return (
@@ -242,24 +261,21 @@ function App({ campaignId }: AppProps) {
       </section>
 
       <section className="data-refresh" aria-label="Data refresh" aria-busy={isRefreshing}>
-        <div className="data-refresh__content">
-          <h2>Need the latest changes?</h2>
-          <p>
-            Admins and other users can update this campaign while you have this page open. Use
-            Refresh Data to sync your view before voting or withdrawing a vote.
-          </p>
-          <div className="data-refresh__meta">
-            {lastUpdatedAt && (
-              <span className="data-refresh__timestamp">
-                Last updated: {formatLastUpdated(lastUpdatedAt)}
-              </span>
-            )}
-            {refreshSuccessMessage && (
-              <span className="data-refresh__success" role="status">
-                {refreshSuccessMessage}
-              </span>
-            )}
-          </div>
+        <div className="data-refresh__meta">
+          {lastUpdatedAt && (
+            <span className="data-refresh__timestamp">
+              Last updated: {formatLastUpdated(lastUpdatedAt)}
+            </span>
+          )}
+          {refreshSuccessMessage && (
+            <span className="data-refresh__success" role="status">
+              {/* Checkmark icon */}
+              <svg viewBox="0 0 14 14" fill="none" aria-hidden="true" width="12" height="12">
+                <path d="M2.5 7l3.5 3.5 5.5-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              {refreshSuccessMessage}
+            </span>
+          )}
         </div>
         <button
           type="button"
@@ -267,13 +283,18 @@ function App({ campaignId }: AppProps) {
           onClick={() => void refreshData({ manual: true })}
           disabled={isRefreshing}
         >
-          {isRefreshing ? 'Refreshing…' : 'Refresh Data'}
+          {/* Refresh icon */}
+          <svg viewBox="0 0 14 14" fill="none" aria-hidden="true" width="12" height="12">
+            <path d="M12.5 2v3.5H9" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M12.3 5.5A5.5 5.5 0 1 1 9.3 2" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+          </svg>
+          {isRefreshing ? 'Refreshing…' : 'Refresh data'}
         </button>
       </section>
 
       {actionError && (
         <p className="action-error" role="alert">
-          {actionError}
+          <span className="action-error__body">{actionError}</span>
           <button
             type="button"
             className="action-error__dismiss"
@@ -327,6 +348,8 @@ function App({ campaignId }: AppProps) {
         onVote={handleVote}
         isVoteDisabled={isVoteDisabled}
       />
+
+      <Footer />
     </main>
   )
 }

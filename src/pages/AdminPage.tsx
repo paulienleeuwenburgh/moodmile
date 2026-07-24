@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { Campaign, Question, Suggestion } from '../types'
+import { Footer } from '../components/Footer'
 import {
   fetchCampaign,
   fetchQuestions,
@@ -435,41 +436,51 @@ export function AdminPage() {
           <section className="admin-section">
             <h2>Active candidates ({suggestions.length})</h2>
             {suggestions.length === 0 ? (
-              <p className="admin-empty">No active candidates.</p>
+              <div className="empty-state">
+                {/* People / empty list icon */}
+                <svg className="empty-state__icon" viewBox="0 0 48 48" fill="none" aria-hidden="true" width="48" height="48">
+                  <circle cx="24" cy="16" r="7" stroke="currentColor" strokeWidth="2.5" />
+                  <path d="M8 40c0-8.837 7.163-16 16-16s16 7.163 16 16" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                </svg>
+                <p className="empty-state__title">No active candidates</p>
+                <p className="empty-state__desc">No candidates have been submitted for this campaign yet.</p>
+              </div>
             ) : (
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>Category</th>
-                    <th>Candidate</th>
-                    <th>Votes</th>
-                    <th>Created</th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {suggestions
-                    .slice()
-                    .sort((a, b) => a.questionId.localeCompare(b.questionId) || a.name.localeCompare(b.name))
-                    .map((s) => (
-                      <tr key={s.id}>
-                        <td>{questionById[s.questionId]?.title ?? s.questionId}</td>
-                        <td>{s.name}</td>
-                        <td>{s.votes}</td>
-                        <td>{new Date(s.createdAt).toLocaleDateString()}</td>
-                        <td>
-                          <button
-                            type="button"
-                            className="admin-btn admin-btn--sm admin-btn--danger"
-                            onClick={() => handleDeleteSuggestion(s)}
-                          >
-                            Delete
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
+              <div className="admin-table-wrap">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Category</th>
+                      <th>Candidate</th>
+                      <th>Votes</th>
+                      <th>Created</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {suggestions
+                      .slice()
+                      .sort((a, b) => a.questionId.localeCompare(b.questionId) || a.name.localeCompare(b.name))
+                      .map((s) => (
+                        <tr key={s.id}>
+                          <td>{questionById[s.questionId]?.title ?? s.questionId}</td>
+                          <td>{s.name}</td>
+                          <td>{s.votes}</td>
+                          <td>{new Date(s.createdAt).toLocaleDateString()}</td>
+                          <td>
+                            <button
+                              type="button"
+                              className="admin-btn admin-btn--sm admin-btn--danger"
+                              onClick={() => handleDeleteSuggestion(s)}
+                            >
+                              Delete
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </section>
 
@@ -483,45 +494,55 @@ export function AdminPage() {
               Restoring it makes those preserved votes active again immediately.
             </p>
             {deletedSuggestions.length === 0 ? (
-              <p className="admin-empty">No deleted candidates.</p>
+              <div className="empty-state">
+                {/* Tick / all-clear icon */}
+                <svg className="empty-state__icon" viewBox="0 0 48 48" fill="none" aria-hidden="true" width="48" height="48">
+                  <circle cx="24" cy="24" r="18" stroke="currentColor" strokeWidth="2.5" />
+                  <path d="M15 24l6 6 12-12" stroke="currentColor" strokeWidth="2.75" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                <p className="empty-state__title">No deleted candidates</p>
+                <p className="empty-state__desc">All candidates are active. Nothing has been soft-deleted.</p>
+              </div>
             ) : (
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>Category</th>
-                    <th>Candidate</th>
-                    <th>Votes</th>
-                    <th>Deleted at</th>
-                    <th>Deleted by</th>
-                    <th>Reason</th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {deletedSuggestions
-                    .slice()
-                    .sort((a, b) => (b.deletedAt ?? '').localeCompare(a.deletedAt ?? ''))
-                    .map((s) => (
-                      <tr key={s.id} className="admin-table__row--deleted">
-                        <td>{questionById[s.questionId]?.title ?? s.questionId}</td>
-                        <td>{s.name}</td>
-                        <td>{s.votes}</td>
-                        <td>{s.deletedAt ? new Date(s.deletedAt).toLocaleString() : '—'}</td>
-                        <td>{s.deletedBy || '—'}</td>
-                        <td>{s.deleteReason || '—'}</td>
-                        <td>
-                          <button
-                            type="button"
-                            className="admin-btn admin-btn--sm admin-btn--restore"
-                            onClick={() => handleRestoreSuggestion(s)}
-                          >
-                            Restore
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
+              <div className="admin-table-wrap">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Category</th>
+                      <th>Candidate</th>
+                      <th>Votes</th>
+                      <th>Deleted at</th>
+                      <th>Deleted by</th>
+                      <th>Reason</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {deletedSuggestions
+                      .slice()
+                      .sort((a, b) => (b.deletedAt ?? '').localeCompare(a.deletedAt ?? ''))
+                      .map((s) => (
+                        <tr key={s.id} className="admin-table__row--deleted">
+                          <td>{questionById[s.questionId]?.title ?? s.questionId}</td>
+                          <td>{s.name}</td>
+                          <td>{s.votes}</td>
+                          <td>{s.deletedAt ? new Date(s.deletedAt).toLocaleString() : '—'}</td>
+                          <td>{s.deletedBy || '—'}</td>
+                          <td>{s.deleteReason || '—'}</td>
+                          <td>
+                            <button
+                              type="button"
+                              className="admin-btn admin-btn--sm admin-btn--restore"
+                              onClick={() => handleRestoreSuggestion(s)}
+                            >
+                              Restore
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </section>
         </>
@@ -531,26 +552,30 @@ export function AdminPage() {
       {confirm && (
         <div className="admin-overlay" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
           <div className="admin-dialog">
-            <h3 id="confirm-title">{confirm.title}</h3>
-            <p style={{ whiteSpace: 'pre-line' }}>{confirm.message}</p>
-            {confirm.confirmText && (
-              <div className="admin-dialog__confirm-field">
-                <label htmlFor="confirm-input" className="admin-dialog__confirm-label">
-                  Type <strong>{confirm.confirmText}</strong> to confirm:
-                </label>
-                <input
-                  id="confirm-input"
-                  type="text"
-                  value={confirmInputValue}
-                  onChange={(e) => setConfirmInputValue(e.target.value)}
-                  placeholder={confirm.confirmText}
-                  autoComplete="off"
-                  // eslint-disable-next-line jsx-a11y/no-autofocus
-                  autoFocus
-                  className="admin-dialog__confirm-input"
-                />
-              </div>
-            )}
+            <div className={`admin-dialog__header${confirm.isDangerous !== false ? ' admin-dialog__header--danger' : ''}`}>
+              <h3 id="confirm-title">{confirm.title}</h3>
+            </div>
+            <div className="admin-dialog__body">
+              <p>{confirm.message}</p>
+              {confirm.confirmText && (
+                <div className="admin-dialog__confirm-field">
+                  <label htmlFor="confirm-input" className="admin-dialog__confirm-label">
+                    Type <strong>{confirm.confirmText}</strong> to confirm:
+                  </label>
+                  <input
+                    id="confirm-input"
+                    type="text"
+                    value={confirmInputValue}
+                    onChange={(e) => setConfirmInputValue(e.target.value)}
+                    placeholder={confirm.confirmText}
+                    autoComplete="off"
+                    // eslint-disable-next-line jsx-a11y/no-autofocus
+                    autoFocus
+                    className="admin-dialog__confirm-input"
+                  />
+                </div>
+              )}
+            </div>
             <div className="admin-dialog__actions">
               <button
                 type="button"
@@ -571,6 +596,8 @@ export function AdminPage() {
           </div>
         </div>
       )}
+
+      <Footer />
     </main>
   )
 }
