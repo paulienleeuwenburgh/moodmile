@@ -2,11 +2,21 @@ import type { Campaign, Question, Suggestion } from './types'
 
 const BASE = '/api'
 
+export class ApiError extends Error {
+  status: number
+
+  constructor(status: number, message: string) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+  }
+}
+
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${BASE}${path}`, init)
   if (!response.ok) {
     const body = await response.json().catch(() => ({}))
-    throw new Error((body as { error?: string }).error ?? `HTTP ${response.status}`)
+    throw new ApiError(response.status, (body as { error?: string }).error ?? `HTTP ${response.status}`)
   }
   return response.json() as Promise<T>
 }
@@ -35,8 +45,7 @@ export async function postSuggestion(
       body: JSON.stringify({ campaignId, questionId, name }),
     })
   } catch (err) {
-    // 409 Conflict means duplicate — treat as a no-op
-    if (err instanceof Error && err.message.includes('already exists')) {
+    if (err instanceof ApiError && err.status === 409) {
       return null
     }
     throw err

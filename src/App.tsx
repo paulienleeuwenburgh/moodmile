@@ -7,10 +7,11 @@ import { SuggestionBoard } from './components/SuggestionBoard'
 import { SuggestionForm } from './components/SuggestionForm'
 import { VotingRules } from './components/VotingRules'
 import type { Campaign, Question, Suggestion } from './types'
-import { fetchCampaign, fetchQuestions, fetchSuggestions, fetchVoteCounts, postSuggestion, postVote } from './api'
+import { ApiError, fetchCampaign, fetchQuestions, fetchSuggestions, fetchVoteCounts, postSuggestion, postVote } from './api'
 import { getSessionId } from './utils/sessionId'
 import { canCastVote, getClientVoteRecords } from './utils/voteLimits'
 import { handleImageError } from './utils/imageError'
+import { useDocumentTitle } from './hooks/useDocumentTitle'
 
 interface AppProps {
   campaignId: string
@@ -39,6 +40,14 @@ function App({ campaignId }: AppProps) {
   const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null)
 
   const voteRecords = getClientVoteRecords(suggestions, voteCountById)
+
+  useDocumentTitle(
+    campaign
+      ? `${campaign.title} | MoodMile`
+      : campaignNotFound
+        ? 'Campaign not found | MoodMile'
+        : 'MoodMile',
+  )
 
   const refreshData = useCallback(async ({ manual = false }: { manual?: boolean } = {}) => {
     const sessionId = getSessionId()
@@ -73,7 +82,7 @@ function App({ campaignId }: AppProps) {
         setTimeout(() => setRefreshSuccessMessage(''), 4000)
       }
     } catch (err: unknown) {
-      const isNotFound = err instanceof Error && err.message.includes('Campaign not found')
+      const isNotFound = err instanceof ApiError && err.status === 404
       if (isNotFound) {
         setCampaignNotFound(true)
       }
@@ -133,6 +142,11 @@ function App({ campaignId }: AppProps) {
       })
       .catch((err: unknown) => {
         setSuggestions((current) => current.filter((s) => s.id !== tempId))
+        if (err instanceof ApiError && err.status === 403) {
+          setActionError('Suggestions are closed for this campaign.')
+          void refreshData()
+          return
+        }
         setActionError(err instanceof Error ? err.message : 'Failed to save suggestion. Please try again.')
       })
   }
@@ -158,7 +172,7 @@ function App({ campaignId }: AppProps) {
         revoke,
       )
     } catch (err) {
-      if (err instanceof Error && err.message.includes('Suggestion not found')) {
+      if (err instanceof ApiError && err.status === 404) {
         setActionError(STALE_DATA_MESSAGE)
         return
       }
@@ -244,19 +258,21 @@ function App({ campaignId }: AppProps) {
   return (
     <main className="app-shell">
       <section className="hero">
-        <p className="hero__eyebrow">MOODMILE</p>
-        <h1>{campaign.title}</h1>
-        <p>
-          {campaign.description}
-        </p>
+        <div className="hero__content">
+          <p className="hero__eyebrow">MOODMILE</p>
+          <h1>{campaign.title}</h1>
+          <p>{campaign.description}</p>
+        </div>
         {campaign.bannerImageUrl && (
-          <img
-            src={campaign.bannerImageUrl}
-            alt=""
-            aria-hidden="true"
-            className="hero__banner"
-            onError={handleImageError}
-          />
+          <div className="hero__media">
+            <img
+              src={campaign.bannerImageUrl}
+              alt=""
+              aria-hidden="true"
+              className="hero__banner"
+              onError={handleImageError}
+            />
+          </div>
         )}
       </section>
 
@@ -324,12 +340,19 @@ function App({ campaignId }: AppProps) {
         votesUsed={voteRecords.length}
       />
 
-      <SuggestionForm
-        questions={questions}
-        selectedQuestionId={selectedQuestionId}
-        onQuestionChange={setSelectedQuestionId}
-        onSubmitSuggestion={handleSuggestionSubmit}
-      />
+      {campaign.allowSuggestions ? (
+        <SuggestionForm
+          questions={questions}
+          selectedQuestionId={selectedQuestionId}
+          onQuestionChange={setSelectedQuestionId}
+          onSubmitSuggestion={handleSuggestionSubmit}
+        />
+      ) : (
+        <section className="suggestion-state suggestion-state--closed" aria-label="Suggestions closed">
+          <h2>Suggestions are closed</h2>
+          <p>This campaign is in voting-only mode. You can still review the published candidates and cast votes.</p>
+        </section>
+      )}
 
       <SuggestionBoard
         campaign={campaign}

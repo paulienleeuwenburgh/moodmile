@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { SyntheticEvent } from 'react'
 import type { Question } from '../types'
 import { handleImageError } from '../utils/imageError'
 import { ImageLightbox } from './ImageLightbox'
@@ -9,8 +10,33 @@ interface QuestionCardProps {
   onSelect: (questionId: string) => void
 }
 
+// 0.9 ~= 9:10; anything narrower is treated as portrait.
+const PORTRAIT_RATIO_THRESHOLD = 0.9
+// Up to 1.15 keeps near-square images out of the wide landscape treatment.
+const SQUARE_RATIO_THRESHOLD = 1.15
+
 export function QuestionCard({ question, isSelected, onSelect }: QuestionCardProps) {
   const [lightboxOpen, setLightboxOpen] = useState(false)
+  const [imageVariant, setImageVariant] = useState<'landscape' | 'portrait' | 'square'>('landscape')
+
+  function handleImageLoad(event: SyntheticEvent<HTMLImageElement>) {
+    const { naturalWidth, naturalHeight } = event.currentTarget
+    if (!naturalWidth || !naturalHeight) {
+      setImageVariant('landscape')
+      return
+    }
+
+    const ratio = naturalWidth / naturalHeight
+    if (ratio < PORTRAIT_RATIO_THRESHOLD) {
+      setImageVariant('portrait')
+      return
+    }
+    if (ratio <= SQUARE_RATIO_THRESHOLD) {
+      setImageVariant('square')
+      return
+    }
+    setImageVariant('landscape')
+  }
 
   return (
     <>
@@ -23,14 +49,18 @@ export function QuestionCard({ question, isSelected, onSelect }: QuestionCardPro
         className={`question-card${isSelected ? ' question-card--selected' : ''}`}
         aria-label={question.title}
       >
-        <div className="question-card__image-wrap">
+        <div className={`question-card__image-wrap question-card__image-wrap--${imageVariant}`}>
           {question.imageUrl ? (
             <>
               <img
                 src={question.imageUrl}
                 alt={question.title}
-                className="question-card__image"
-                onError={handleImageError}
+                className={`question-card__image question-card__image--${imageVariant}`}
+                onLoad={handleImageLoad}
+                onError={(event) => {
+                  setImageVariant('landscape')
+                  handleImageError(event)
+                }}
               />
               <button
                 type="button"

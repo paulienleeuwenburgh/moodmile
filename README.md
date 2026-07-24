@@ -5,8 +5,8 @@ MoodMile is a generic polling app built with React + TypeScript. Campaigns and q
 ## Features
 
 - Responsive, colorful UI for desktop and mobile
-- Mascot cards with image, title, and description
-- Mascot selection + name suggestion form
+- Question cards with responsive image, title, and description
+- Suggestion form shown only when the active campaign allows submissions
 - Multiple submissions supported
 - Suggestions shown as grouped cards by question
 - Suggestions persisted in **Azure Table Storage** (shared across all users)
@@ -16,6 +16,7 @@ MoodMile is a generic polling app built with React + TypeScript. Campaigns and q
 - Backend API built with **Azure Functions** (no storage keys exposed to the browser)
 - Campaigns and questions are data-driven: configured in Azure Table Storage without code changes
 - Multiple campaigns can run in parallel, each accessed by its own URL
+- Browser and admin tab titles follow the active campaign
 - Default ninja-naming campaign is seeded automatically on first request
 
 ## Campaign URLs
@@ -106,7 +107,7 @@ Stores questions (categories) for a campaign. Each row is one question.
 | `RowKey` | string | `questionId` (e.g. `ninja-1`) |
 | `title` | string | Displayed on the question card and in suggestion groups |
 | `description` | string | Short description shown on the question card |
-| `imageUrl` | string | Optional. Path to question image (e.g. `/mascots/ninja1.png`). Leave empty for no image — the card renders gracefully without one. |
+| `imageUrl` | string | Optional. Path to question image (e.g. `/mascots/ninja1.png`). Leave empty for no image — the card renders gracefully without one. Use a `16:9` landscape image where possible for the most consistent preview. |
 | `sortOrder` | int | Questions are sorted ascending by this value |
 | `createdAt` | string | ISO 8601 timestamp |
 | `updatedAt` | string | ISO 8601 timestamp |
@@ -463,6 +464,8 @@ Insert into the **questions** table (one row per player):
 | `best-padeller` | `player-2` | Bob | 2 |
 
 > **Note**: Set the `ninja-naming` campaign `status` to `closed` to hide it from the app once a new active campaign is running.
+
+When `allowSuggestions` is `false`, the public campaign page hides the submission form and switches to a voting-only experience.
 
 ### Example: "Where should we eat next week?"
 

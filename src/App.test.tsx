@@ -17,6 +17,14 @@ const mockPostVote = vi.fn<
 >()
 
 vi.mock('./api', () => ({
+  ApiError: class ApiError extends Error {
+    status: number
+
+    constructor(status: number, message: string) {
+      super(message)
+      this.status = status
+    }
+  },
   fetchCampaign: (...args: Parameters<typeof mockFetchCampaign>) => mockFetchCampaign(...args),
   fetchQuestions: (...args: Parameters<typeof mockFetchQuestions>) => mockFetchQuestions(...args),
   fetchSuggestions: (...args: Parameters<typeof mockFetchSuggestions>) =>
@@ -109,6 +117,11 @@ function getVoteCount(): number {
   return parseInt(document.querySelector('.vote-btn__count')!.textContent ?? '0', 10)
 }
 
+async function createApiError(status: number, message: string) {
+  const { ApiError } = await import('./api')
+  return new ApiError(status, message)
+}
+
 const threeSuggestions: Suggestion[] = [
   { id: 'hanzo', campaignId: 'ninja-naming', questionId: 'ninja-1', name: 'Hanzo', createdAt: '2024-01-01T00:00:00.000Z', votes: 0 },
   { id: 'yuki', campaignId: 'ninja-naming', questionId: 'ninja-1', name: 'Yuki', createdAt: '2024-01-02T00:00:00.000Z', votes: 0 },
@@ -118,6 +131,7 @@ const threeSuggestions: Suggestion[] = [
 beforeEach(() => {
   vi.clearAllMocks()
   localStorage.clear()
+  document.title = 'MoodMile'
   // Default API responses so tests that don't call setupApi() still render the full UI.
   mockFetchCampaign.mockResolvedValue(ninjaCampaign)
   mockFetchQuestions.mockResolvedValue(ninjaQuestions)
@@ -606,7 +620,7 @@ describe('stale data refresh UX', () => {
     mockFetchQuestions.mockResolvedValue(ninjaQuestions)
     mockFetchSuggestions.mockResolvedValue([deletedSuggestion])
     mockFetchVoteCounts.mockResolvedValue(new Map([[deletedSuggestion.id, 1]]))
-    mockPostVote.mockRejectedValue(new Error('Suggestion not found'))
+    mockPostVote.mockRejectedValue(await createApiError(404, 'Suggestion not found'))
 
     render(<App campaignId="ninja-naming" />)
     await screen.findAllByRole('button', { name: /remove vote for rocket/i })
@@ -865,6 +879,7 @@ describe('campaign routing', () => {
     await screen.findByText('Best Padeller 2026')
     expect(screen.getByText('Nominate and vote for the best padeller of 2026.')).toBeInTheDocument()
     expect(mockFetchCampaign).toHaveBeenCalledWith('best-padeller-2026')
+    expect(document.title).toBe('Best Padeller 2026 | MoodMile')
   })
 
   it('two campaigns can coexist — loading one does not affect the other', async () => {
@@ -886,10 +901,36 @@ describe('campaign routing', () => {
   })
 
   it('shows a campaign-not-found message for an unknown campaign', async () => {
-    mockFetchCampaign.mockRejectedValue(new Error('Campaign not found'))
+    mockFetchCampaign.mockRejectedValue(await createApiError(404, 'Campaign not found'))
     render(<App campaignId="does-not-exist" />)
     await screen.findByText('Campaign not found')
     expect(screen.getByText('Campaign not found')).toBeInTheDocument()
+    expect(document.title).toBe('Campaign not found | MoodMile')
+  })
+})
+
+describe('suggestion availability', () => {
+  it('hides the suggestion form and shows a closed state when allowSuggestions=false', async () => {
+    const votingOnlyCampaign: Campaign = {
+      ...ninjaCampaign,
+      id: 'best-padeller-2026',
+      title: 'Best Padeller 2026',
+      description: 'Vote for the best padeller.',
+      allowSuggestions: false,
+      maxVotesTotal: 3,
+      maxVotesPerCategory: 3,
+      maxVotesPerCandidate: 2,
+    }
+    const votingOnlyQuestions: Question[] = [
+      { id: 'nominees', campaignId: 'best-padeller-2026', title: 'Who do you nominate?', description: 'Suggest and vote for your favourite padeller.', sortOrder: 1 },
+    ]
+
+    setupApi([], [], votingOnlyCampaign, votingOnlyQuestions)
+    render(<App campaignId="best-padeller-2026" />)
+
+    await screen.findByRole('heading', { name: /suggestions are closed/i })
+    expect(screen.queryByRole('heading', { name: /submit name suggestions/i })).not.toBeInTheDocument()
+    expect(screen.getByText('Suggestions are closed for this question.')).toBeInTheDocument()
   })
 })
 

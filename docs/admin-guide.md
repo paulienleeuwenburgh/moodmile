@@ -27,6 +27,7 @@ Add `ADMIN_SECRET` to your Azure Functions application settings (or `local.setti
 Navigate to `/admin` in the app. Enter the admin secret in the password field, enter a Campaign ID, and click **Load campaign**.
 
 On success, a green **"Admin access granted"** banner appears at the top, showing the campaign title and a **Logout** button that clears the secret from browser memory.
+The browser tab title also updates to `MoodMile Admin | <campaign title>` after a campaign is loaded.
 
 > **Security note:** The secret is kept in React component state only. It is never written to `localStorage`, cookies, or sent in GET requests. HTTPS is enforced by Azure Static Web Apps for all traffic.
 
@@ -40,6 +41,8 @@ On success, a green **"Admin access granted"** banner appears at the top, showin
 |---|---|
 | Unauthenticated | Login form visible |
 | Authenticated | Green banner: "Admin access granted — Campaign: \<title\>" + Logout button |
+
+When unauthenticated, the browser tab title is `MoodMile Admin`.
 
 The **Logout** button clears the secret and all campaign data from memory and returns the UI to the login form.
 
