@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Campaign, Question, Suggestion } from '../types'
 import { Footer } from '../components/Footer'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import {
   fetchCampaign,
   fetchQuestions,
@@ -77,6 +78,8 @@ export function AdminPage() {
   const questionById = Object.fromEntries(questions.map((q) => [q.id, q]))
   const totalVotes = [...suggestions, ...deletedSuggestions].reduce((sum, s) => sum + s.votes, 0)
   const canConfirm = !confirm?.confirmText || confirmInputValue === confirm.confirmText
+
+  useDocumentTitle(campaign ? `MoodMile Admin | ${campaign.title}` : 'MoodMile Admin')
 
   function showSuccess(msg: string) {
     setSuccessMessage(msg)

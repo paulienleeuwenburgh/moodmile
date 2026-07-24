@@ -118,9 +118,10 @@ const threeSuggestions: Suggestion[] = [
 beforeEach(() => {
   vi.clearAllMocks()
   localStorage.clear()
-  // Default API responses so tests that don't call setupApi() still render the full UI.
-  mockFetchCampaign.mockResolvedValue(ninjaCampaign)
-  mockFetchQuestions.mockResolvedValue(ninjaQuestions)
+document.title = 'MoodMile'
+// Default API responses so tests that don't call setupApi() still render the full UI.
+mockFetchCampaign.mockResolvedValue(ninjaCampaign)
+mockFetchQuestions.mockResolvedValue(ninjaQuestions)
   mockFetchSuggestions.mockResolvedValue([])
   mockFetchVoteCounts.mockResolvedValue(new Map())
 })
@@ -865,6 +866,7 @@ describe('campaign routing', () => {
     await screen.findByText('Best Padeller 2026')
     expect(screen.getByText('Nominate and vote for the best padeller of 2026.')).toBeInTheDocument()
     expect(mockFetchCampaign).toHaveBeenCalledWith('best-padeller-2026')
+    expect(document.title).toBe('Best Padeller 2026 | MoodMile')
   })
 
   it('two campaigns can coexist — loading one does not affect the other', async () => {
@@ -890,6 +892,32 @@ describe('campaign routing', () => {
     render(<App campaignId="does-not-exist" />)
     await screen.findByText('Campaign not found')
     expect(screen.getByText('Campaign not found')).toBeInTheDocument()
+    expect(document.title).toBe('Campaign not found | MoodMile')
+  })
+})
+
+describe('suggestion availability', () => {
+  it('hides the suggestion form and shows a closed state when allowSuggestions=false', async () => {
+    const votingOnlyCampaign: Campaign = {
+      ...ninjaCampaign,
+      id: 'best-padeller-2026',
+      title: 'Best Padeller 2026',
+      description: 'Vote for the best padeller.',
+      allowSuggestions: false,
+      maxVotesTotal: 3,
+      maxVotesPerCategory: 3,
+      maxVotesPerCandidate: 2,
+    }
+    const votingOnlyQuestions: Question[] = [
+      { id: 'nominees', campaignId: 'best-padeller-2026', title: 'Who do you nominate?', description: 'Suggest and vote for your favourite padeller.', sortOrder: 1 },
+    ]
+
+    setupApi([], [], votingOnlyCampaign, votingOnlyQuestions)
+    render(<App campaignId="best-padeller-2026" />)
+
+    await screen.findByRole('heading', { name: /suggestions are closed/i })
+    expect(screen.queryByRole('heading', { name: /submit name suggestions/i })).not.toBeInTheDocument()
+    expect(screen.getByText('Suggestions are closed for this question.')).toBeInTheDocument()
   })
 })
 

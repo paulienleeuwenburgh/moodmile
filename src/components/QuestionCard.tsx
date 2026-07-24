@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { SyntheticEvent } from 'react'
 import type { Question } from '../types'
 import { handleImageError } from '../utils/imageError'
 import { ImageLightbox } from './ImageLightbox'
@@ -11,6 +12,25 @@ interface QuestionCardProps {
 
 export function QuestionCard({ question, isSelected, onSelect }: QuestionCardProps) {
   const [lightboxOpen, setLightboxOpen] = useState(false)
+  const [imageVariant, setImageVariant] = useState<'landscape' | 'portrait' | 'square'>('landscape')
+
+  function handleImageLoad(event: SyntheticEvent<HTMLImageElement>) {
+    const { naturalWidth, naturalHeight } = event.currentTarget
+    if (!naturalWidth || !naturalHeight) {
+      return
+    }
+
+    const ratio = naturalWidth / naturalHeight
+    if (ratio < 0.9) {
+      setImageVariant('portrait')
+      return
+    }
+    if (ratio <= 1.15) {
+      setImageVariant('square')
+      return
+    }
+    setImageVariant('landscape')
+  }
 
   return (
     <>
@@ -23,14 +43,18 @@ export function QuestionCard({ question, isSelected, onSelect }: QuestionCardPro
         className={`question-card${isSelected ? ' question-card--selected' : ''}`}
         aria-label={question.title}
       >
-        <div className="question-card__image-wrap">
+        <div className={`question-card__image-wrap question-card__image-wrap--${imageVariant}`}>
           {question.imageUrl ? (
             <>
               <img
                 src={question.imageUrl}
                 alt={question.title}
-                className="question-card__image"
-                onError={handleImageError}
+                className={`question-card__image question-card__image--${imageVariant}`}
+                onLoad={handleImageLoad}
+                onError={(event) => {
+                  setImageVariant('landscape')
+                  handleImageError(event)
+                }}
               />
               <button
                 type="button"
