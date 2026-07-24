@@ -10,7 +10,9 @@ interface QuestionCardProps {
   onSelect: (questionId: string) => void
 }
 
+// 0.9 ~= 9:10; anything narrower is treated as portrait.
 const PORTRAIT_RATIO_THRESHOLD = 0.9
+// Up to 1.15 keeps near-square images out of the wide landscape treatment.
 const SQUARE_RATIO_THRESHOLD = 1.15
 
 export function QuestionCard({ question, isSelected, onSelect }: QuestionCardProps) {

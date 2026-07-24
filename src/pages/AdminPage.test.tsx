@@ -31,6 +31,11 @@ vi.mock('../api', () => ({
   adminFullReset: vi.fn(),
 }))
 
+async function createApiError(status: number, message: string) {
+  const { ApiError } = await import('../api')
+  return new ApiError(status, message)
+}
+
 describe('AdminPage document title', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -77,5 +82,31 @@ describe('AdminPage document title', () => {
 
     await screen.findByText('Admin access granted')
     expect(document.title).toBe('MoodMile Admin | Best Padeller 2026')
+  })
+
+  it('shows the invalid secret message for a 401 API error', async () => {
+    mockFetchCampaign.mockRejectedValueOnce(await createApiError(401, 'Unauthorized'))
+
+    render(<AdminPage />)
+
+    await userEvent.type(screen.getByLabelText(/admin secret/i), 'secret')
+    await userEvent.click(screen.getByRole('button', { name: /load campaign/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Invalid admin secret. Please check your credentials and try again.',
+    )
+  })
+
+  it('shows the server error message for a 500 API error', async () => {
+    mockFetchCampaign.mockRejectedValueOnce(await createApiError(500, 'HTTP 500'))
+
+    render(<AdminPage />)
+
+    await userEvent.type(screen.getByLabelText(/admin secret/i), 'secret')
+    await userEvent.click(screen.getByRole('button', { name: /load campaign/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Unexpected server error. Please try again later.',
+    )
   })
 })

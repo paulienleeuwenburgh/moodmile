@@ -143,8 +143,8 @@ function App({ campaignId }: AppProps) {
       .catch((err: unknown) => {
         setSuggestions((current) => current.filter((s) => s.id !== tempId))
         if (err instanceof ApiError && err.status === 403) {
-          setCampaign((current) => (current ? { ...current, allowSuggestions: false } : current))
           setActionError('Suggestions are closed for this campaign.')
+          void refreshData()
           return
         }
         setActionError(err instanceof Error ? err.message : 'Failed to save suggestion. Please try again.')
