@@ -63,24 +63,6 @@ export function QuestionCard({ question, isSelected, onSelect }: QuestionCardPro
                   handleImageError(event)
                 }}
               />
-              {/* 
-              <button
-                type="button"
-                className="question-card__expand-btn"
-                onClick={() => setLightboxOpen(true)}
-                aria-label={`View larger image for ${question.title}`}
-              >
-                <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" width="13" height="13">
-                  <path
-                    d="M10 2h4v4M6 14H2v-4M14 10v4h-4M2 6V2h4"
-                    stroke="currentColor"
-                    strokeWidth="1.75"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </button> 
-              */}
             </>
           ) : null}
         </div>
