@@ -407,44 +407,6 @@
   padding: 1rem;
 }
 
-/* Expand-image button — shown on hover of the image-wrap */
-.question-card__expand-btn {
-  position: absolute;
-  bottom: 0.5rem;
-  right: 0.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  background: rgba(255, 255, 255, 0.88);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-xs);
-  cursor: pointer;
-  color: var(--color-text-muted);
-  opacity: 0;
-  transition: opacity 0.14s ease, background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
-  backdrop-filter: blur(4px);
-}
-
-.question-card__image-wrap:hover .question-card__expand-btn,
-.question-card__image-wrap:focus-within .question-card__expand-btn {
-  opacity: 1;
-}
-
-.question-card__expand-btn:hover {
-  background: #ffffff;
-  color: var(--color-primary);
-  border-color: var(--color-primary);
-  opacity: 1;
-}
-
-.question-card__expand-btn:focus-visible {
-  opacity: 1;
-  outline: 2px solid var(--color-primary);
-  outline-offset: 2px;
-}
-
 /* Full-width select button under the image */
 .question-card__select-btn {
   width: 100%;
