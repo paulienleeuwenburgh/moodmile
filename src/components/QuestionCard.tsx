@@ -56,19 +56,20 @@ export function QuestionCard({ question, isSelected, onSelect }: QuestionCardPro
                 src={question.imageUrl}
                 alt={question.title}
                 className={`question-card__image question-card__image--${imageVariant}`}
+                onClick={() => setLightboxOpen(true)}
                 onLoad={handleImageLoad}
                 onError={(event) => {
                   setImageVariant('landscape')
                   handleImageError(event)
                 }}
               />
+              {/* 
               <button
                 type="button"
                 className="question-card__expand-btn"
                 onClick={() => setLightboxOpen(true)}
                 aria-label={`View larger image for ${question.title}`}
               >
-                {/* Expand / fullscreen icon */}
                 <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" width="13" height="13">
                   <path
                     d="M10 2h4v4M6 14H2v-4M14 10v4h-4M2 6V2h4"
@@ -78,7 +79,8 @@ export function QuestionCard({ question, isSelected, onSelect }: QuestionCardPro
                     strokeLinejoin="round"
                   />
                 </svg>
-              </button>
+              </button> 
+              */}
             </>
           ) : null}
         </div>
