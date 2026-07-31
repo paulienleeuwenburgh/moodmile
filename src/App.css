@@ -397,7 +397,7 @@
 
 .question-card__image--landscape,
 .question-card__image--square {
-  object-fit: cover;
+  object-fit: contain;
 }
 
 .question-card__image--portrait {
