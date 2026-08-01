@@ -486,7 +486,8 @@
 }
 
 .lightbox-img {
-  max-width: 100%;
+  width: 90vw;
+  height: auto;
   max-height: 96vh;
   object-fit: contain;
   border-radius: var(--radius-sm);
