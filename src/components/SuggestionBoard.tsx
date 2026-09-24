@@ -21,9 +21,9 @@ export function SuggestionBoard({
   const usesSingleVoteButton = campaign.maxVotesPerCandidate === 1
 
   return (
-    <section className="suggestion-board" aria-label={campaign.allowSuggestions ? 'Suggestions by question' : 'Candidates by question'}>
-      <span className="section-eyebrow" aria-hidden="true">Candidates</span>
-      <h2>{campaign.allowSuggestions ? 'Suggestions by question' : 'Candidates by question'}</h2>
+    <section className="suggestion-board" aria-label={campaign.allowSuggestions ? 'Suggestions by question' : 'Submissions by question'}>
+      <span className="section-eyebrow" aria-hidden="true">Submissions</span>
+      <h2>{campaign.allowSuggestions ? 'Suggestions by question' : 'Submissions by question'}</h2>
       <div className="suggestion-board__grid">
         {questions.map((question) => {
           const questionSuggestions = suggestions
