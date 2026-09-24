@@ -507,6 +507,22 @@ describe('VotingRules', () => {
       /4 of 4 total votes remaining/i,
     )
   })
+
+  it('hides redundant per-candidate and per-category limits when they match the total limit', async () => {
+    setupApi([], [], {
+      ...ninjaCampaign,
+      maxVotesTotal: 3,
+      maxVotesPerCandidate: 3,
+      maxVotesPerCategory: 3,
+    })
+    render(<App campaignId="ninja-naming" />)
+    await screen.findByRole('button', { name: /submit/i })
+
+    const rules = screen.getByRole('complementary', { name: /voting rules/i })
+    expect(rules).toHaveTextContent(/3 of 3 total votes remaining/i)
+    expect(rules).not.toHaveTextContent(/votes per candidate/i)
+    expect(rules).not.toHaveTextContent(/votes per category/i)
+  })
 })
 
 describe('vote limit enforcement', () => {
