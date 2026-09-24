@@ -66,7 +66,6 @@ export function SuggestionForm({
           value={suggestion}
           onChange={(event) => handleChange(event.target.value)}
           placeholder="e.g. Sunny Stride"
-          maxLength={60}
           aria-describedby={validationError ? 'name-suggestion-error' : undefined}
           aria-invalid={!!validationError}
         />

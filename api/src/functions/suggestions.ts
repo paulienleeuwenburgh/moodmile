@@ -8,6 +8,7 @@ import {
 } from '../tableClient'
 import { escapeODataString } from '../odata'
 import { getCampaign } from '../campaigns'
+import { validateSuggestion } from '../suggestionValidation'
 
 async function getSuggestions(
   request: HttpRequest,
@@ -52,6 +53,11 @@ async function postSuggestion(
 
   if (!campaignId || !questionId || !name) {
     return { status: 400, jsonBody: { error: 'campaignId, questionId and name are required' } }
+  }
+
+  const validationError = validateSuggestion(name)
+  if (validationError) {
+    return { status: 400, jsonBody: { error: validationError } }
   }
 
   const campaign = await getCampaign(campaignId)

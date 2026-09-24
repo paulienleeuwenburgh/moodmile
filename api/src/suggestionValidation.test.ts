@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { SUGGESTION_MAX_LENGTH, validateSuggestion } from './validateSuggestion'
+import { SUGGESTION_MAX_LENGTH, validateSuggestion } from './suggestionValidation'
 
 describe('validateSuggestion', () => {
   it('accepts punctuation and quotation marks', () => {
