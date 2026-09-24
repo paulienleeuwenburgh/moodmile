@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import type { Question } from '../types'
-import { SUGGESTION_MAX_LENGTH, validateSuggestion } from '../utils/validateSuggestion'
+import { validateSuggestion } from '../utils/validateSuggestion'
 
 interface SuggestionFormProps {
   questions: Question[]
@@ -66,7 +66,6 @@ export function SuggestionForm({
           value={suggestion}
           onChange={(event) => handleChange(event.target.value)}
           placeholder="e.g. Sunny Stride"
-          maxLength={SUGGESTION_MAX_LENGTH}
           aria-describedby={validationError ? 'name-suggestion-error' : undefined}
           aria-invalid={!!validationError}
         />
