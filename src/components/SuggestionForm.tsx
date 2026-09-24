@@ -44,7 +44,7 @@ export function SuggestionForm({
 
   return (
     <form className="suggestion-form" onSubmit={handleSubmit}>
-      <h2>Submit name suggestions</h2>
+      <h2>Share your thoughts</h2>
       <div className="suggestion-form__row">
         <label htmlFor="question-select">Question</label>
         <select
