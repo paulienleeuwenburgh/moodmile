@@ -44,7 +44,7 @@ export function SuggestionForm({
 
   return (
     <form className="suggestion-form" onSubmit={handleSubmit}>
-      <h2>Submit name suggestions</h2>
+      <h2>Share your thoughts</h2>
       <div className="suggestion-form__row">
         <label htmlFor="question-select">Question</label>
         <select
@@ -60,7 +60,7 @@ export function SuggestionForm({
         </select>
       </div>
       <div className="suggestion-form__row">
-        <label htmlFor="name-suggestion">Name suggestion</label>
+        <label htmlFor="name-suggestion">Your answer</label>
         <input
           id="name-suggestion"
           value={suggestion}
@@ -76,7 +76,7 @@ export function SuggestionForm({
           </span>
         )}
       </div>
-      <button type="submit">Add suggestion</button>
+      <button type="submit">Submit</button>
     </form>
   )
 }
