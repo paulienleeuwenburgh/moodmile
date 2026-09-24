@@ -284,10 +284,10 @@ describe('suggestion board ordering', () => {
 
 describe('duplicate suggestions', () => {
   async function submitSuggestion(name: string) {
-    const input = await screen.findByRole('textbox', { name: /name suggestion/i })
+    const input = await screen.findByRole('textbox', { name: /your answer/i })
     await userEvent.clear(input)
     await userEvent.type(input, name)
-    await userEvent.click(screen.getByRole('button', { name: /add suggestion/i }))
+    await userEvent.click(screen.getByRole('button', { name: /submit/i }))
   }
 
   function getSuggestionNames() {
@@ -342,14 +342,14 @@ describe('duplicate suggestions', () => {
 
 describe('input validation', () => {
   async function typeInSuggestion(name: string) {
-    const input = await screen.findByRole('textbox', { name: /name suggestion/i })
+    const input = await screen.findByRole('textbox', { name: /your answer/i })
     await userEvent.clear(input)
     await userEvent.type(input, name)
   }
 
   async function submitSuggestion(name: string) {
     await typeInSuggestion(name)
-    await userEvent.click(screen.getByRole('button', { name: /add suggestion/i }))
+    await userEvent.click(screen.getByRole('button', { name: /submit/i }))
   }
 
   function getSuggestionNames() {
@@ -358,45 +358,57 @@ describe('input validation', () => {
     )
   }
 
-  it('accepts letters, numbers, spaces, apostrophes and hyphens', async () => {
+  it('accepts punctuation, quotation marks, and emoji', async () => {
     setupApi()
     render(<App campaignId="ninja-naming" />)
-    await submitSuggestion("Sunny O'Stride-2")
-    expect(getSuggestionNames()).toContain("Sunny O'Stride-2")
+    await submitSuggestion(`Sunny, "Stride"! 😊 @home #1`)
+    expect(getSuggestionNames()).toContain(`Sunny, "Stride"! 😊 @home #1`)
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
-  it('shows an error and does not submit when emoji is entered', async () => {
+  it('accepts accented characters', async () => {
     setupApi()
     render(<App campaignId="ninja-naming" />)
-    await submitSuggestion('Sunny 😊')
-    expect(screen.getByRole('alert')).toBeInTheDocument()
+    await submitSuggestion('Café über niño')
+    expect(getSuggestionNames()).toContain('Café über niño')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('accepts a 250-character submission', async () => {
+    setupApi()
+    render(<App campaignId="ninja-naming" />)
+    const value = 'a'.repeat(250)
+    await submitSuggestion(value)
+    expect(getSuggestionNames()).toContain(value)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('shows an error and does not submit when the answer exceeds 250 characters', async () => {
+    setupApi()
+    render(<App campaignId="ninja-naming" />)
+    await submitSuggestion('a'.repeat(251))
+    expect(screen.getByRole('alert')).toHaveTextContent('Answers can be up to 250 characters long.')
     expect(getSuggestionNames()).toHaveLength(0)
   })
 
-  it('shows an error and does not submit when unsupported symbol is entered', async () => {
+  it('shows an error and does not submit for script injection attempts', async () => {
     setupApi()
     render(<App campaignId="ninja-naming" />)
-    await submitSuggestion('Name@Invalid')
-    expect(screen.getByRole('alert')).toBeInTheDocument()
+    await submitSuggestion('<script>alert("xss")</script>')
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Answers can include punctuation, quotation marks, emoji, and accented letters, but not angle brackets.',
+    )
     expect(getSuggestionNames()).toHaveLength(0)
-  })
-
-  it('shows a validation error while typing invalid characters', async () => {
-    setupApi()
-    render(<App campaignId="ninja-naming" />)
-    await typeInSuggestion('Bad!')
-    expect(screen.getByRole('alert')).toBeInTheDocument()
   })
 
   it('clears the error when input becomes valid', async () => {
     setupApi()
     render(<App campaignId="ninja-naming" />)
-    const input = await screen.findByRole('textbox', { name: /name suggestion/i })
-    await userEvent.type(input, 'Bad!')
+    const input = await screen.findByRole('textbox', { name: /your answer/i })
+    await userEvent.type(input, '<script>')
     expect(screen.getByRole('alert')).toBeInTheDocument()
     await userEvent.clear(input)
-    await userEvent.type(input, 'Good')
+    await userEvent.type(input, 'Good 😊')
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 })
@@ -446,7 +458,7 @@ describe('leaderboard', () => {
     setupApi()
     render(<App campaignId="ninja-naming" />)
     // Wait for loading to finish then assert
-    await screen.findByRole('button', { name: /add suggestion/i })
+    await screen.findByRole('button', { name: /submit/i })
     expect(document.querySelector('.leaderboard')).not.toBeInTheDocument()
   })
 })
@@ -455,7 +467,7 @@ describe('VotingRules', () => {
   it('shows voting rules on load', async () => {
     setupApi()
     render(<App campaignId="ninja-naming" />)
-    await screen.findByRole('button', { name: /add suggestion/i })
+    await screen.findByRole('button', { name: /submit/i })
 
     const rules = screen.getByRole('complementary', { name: /voting rules/i })
     expect(rules).toBeInTheDocument()
@@ -772,7 +784,7 @@ describe('campaign config loaded from storage', () => {
   it('fetches questions using the campaign ID returned by the API', async () => {
     setupApi()
     render(<App campaignId="ninja-naming" />)
-    await screen.findByRole('button', { name: /add suggestion/i })
+    await screen.findByRole('button', { name: /submit/i })
     expect(mockFetchQuestions).toHaveBeenCalledWith('ninja-naming')
   })
 })
@@ -929,8 +941,12 @@ describe('suggestion availability', () => {
     render(<App campaignId="best-padeller-2026" />)
 
     await screen.findByRole('heading', { name: /suggestions are closed/i })
-    expect(screen.queryByRole('heading', { name: /submit name suggestions/i })).not.toBeInTheDocument()
-    expect(screen.getByText('Suggestions are closed for this question.')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /share your thoughts/i })).not.toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'This campaign is in voting-only mode. You can still review the published candidates and cast votes.',
+      ),
+    ).toBeInTheDocument()
   })
 })
 
