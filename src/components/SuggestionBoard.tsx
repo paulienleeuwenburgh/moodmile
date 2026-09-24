@@ -53,8 +53,8 @@ export function SuggestionBoard({
                     <path d="M8 1v5" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
                   </svg>
                   {campaign.allowSuggestions
-                    ? 'No suggestions yet — be the first!'
-                    : 'Suggestions are closed for this question.'}
+                    ? 'No submissions yet — be the first!'
+                    : 'Submissions are closed for this question.'}
                 </p>
               ) : (
                 <ul>
