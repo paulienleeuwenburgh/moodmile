@@ -337,7 +337,6 @@ function App({ campaignId }: AppProps) {
         maxVotesTotal={campaign.maxVotesTotal}
         maxVotesPerCategory={campaign.maxVotesPerCategory}
         maxVotesPerCandidate={campaign.maxVotesPerCandidate}
-        questionCount={questions.length}
         votesUsed={voteRecords.length}
       />
 

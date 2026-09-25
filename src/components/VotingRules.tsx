@@ -2,7 +2,6 @@ interface VotingRulesProps {
   maxVotesTotal: number
   maxVotesPerCategory: number
   maxVotesPerCandidate: number
-  questionCount: number
   votesUsed: number
 }
 
@@ -10,17 +9,13 @@ export function VotingRules({
   maxVotesTotal,
   maxVotesPerCategory,
   maxVotesPerCandidate,
-  questionCount,
   votesUsed,
 }: VotingRulesProps) {
   const remaining = maxVotesTotal > 0 ? Math.max(0, maxVotesTotal - votesUsed) : null
   const hidePerCandidateConstraint =
     (maxVotesTotal > 0 &&
       maxVotesPerCandidate > 0 &&
-      maxVotesPerCandidate === maxVotesTotal) ||
-    (questionCount === 1 &&
-      maxVotesPerCandidate === 1 &&
-      maxVotesPerCategory === 1)
+      maxVotesPerCandidate === maxVotesTotal)
   const hidePerCategoryConstraint =
     maxVotesTotal > 0 &&
     maxVotesPerCategory > 0 &&

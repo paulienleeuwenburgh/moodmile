@@ -543,24 +543,6 @@ describe('VotingRules', () => {
     expect(rules).toHaveTextContent(/up to 2 votes per candidate/i)
     expect(rules).not.toHaveTextContent(/votes per category/i)
   })
-
-  it('hides the per-candidate rule when a single-category campaign already limits voting to one per category', async () => {
-    setupApi([], [], {
-      ...ninjaCampaign,
-      id: 'single-category',
-      maxVotesTotal: 4,
-      maxVotesPerCandidate: 1,
-      maxVotesPerCategory: 1,
-    }, [
-      { id: 'only-question', campaignId: 'single-category', title: 'Only question', description: 'desc', sortOrder: 1 },
-    ])
-    render(<App campaignId="single-category" />)
-    await screen.findByRole('button', { name: /submit/i })
-
-    const rules = screen.getByRole('complementary', { name: /voting rules/i })
-    expect(rules).toHaveTextContent(/one vote per category/i)
-    expect(rules).not.toHaveTextContent(/one vote per candidate/i)
-  })
 })
 
 describe('vote limit enforcement', () => {
