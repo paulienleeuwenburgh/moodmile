@@ -1,8 +1,14 @@
+/// <reference types="node" />
+import { readFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import type { Campaign, Question, Suggestion } from './types'
+
+const appStyles = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), 'App.css'), 'utf8')
 
 // ---------------------------------------------------------------------------
 // Mock the API module so tests never make real HTTP calls
@@ -452,6 +458,42 @@ describe('leaderboard', () => {
       (el) => el.textContent,
     )
     expect(after).toEqual(['Alpha', 'Beta'])
+  })
+
+  it('keeps long wrapped answers visible in the board and leaderboard', async () => {
+    const longAnswer = 'A long answer that needs to wrap onto multiple lines to stay visible everywhere'
+    const suggestions: Suggestion[] = [
+      { id: 'long-answer', campaignId: 'ninja-naming', questionId: 'ninja-1', name: longAnswer, createdAt: '2024-01-01T00:00:00.000Z', votes: 1 },
+    ]
+    const style = document.createElement('style')
+    style.textContent = appStyles
+    document.head.appendChild(style)
+
+    try {
+      setupApi(suggestions)
+      render(<App campaignId="ninja-naming" />)
+
+      expect(await screen.findAllByText(longAnswer)).toHaveLength(2)
+
+      const suggestionCard = document.querySelector('.suggestion-card')
+      const suggestionName = suggestionCard?.querySelector('.suggestion-card__name')
+      const leaderboardEntry = document.querySelector('.leaderboard-entry')
+      const leaderboardDetails = leaderboardEntry?.querySelector('.leaderboard-entry__details')
+
+      expect(suggestionCard).not.toBeNull()
+      expect(suggestionName).not.toBeNull()
+      expect(leaderboardEntry).not.toBeNull()
+      expect(leaderboardDetails).not.toBeNull()
+
+      expect(suggestionName).toBeVisible()
+      expect(leaderboardDetails).toBeVisible()
+      expect(getComputedStyle(suggestionCard as Element).flexWrap).toBe('wrap')
+      expect(getComputedStyle(suggestionName as Element).flexBasis).toBe('12rem')
+      expect(getComputedStyle(leaderboardEntry as Element).flexWrap).toBe('wrap')
+      expect(getComputedStyle(leaderboardDetails as Element).flexBasis).toBe('12rem')
+    } finally {
+      style.remove()
+    }
   })
 
   it('is not rendered when there are no suggestions', async () => {
