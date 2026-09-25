@@ -469,27 +469,31 @@ describe('leaderboard', () => {
     style.textContent = appStyles
     document.head.appendChild(style)
 
-    setupApi(suggestions)
-    render(<App campaignId="ninja-naming" />)
+    try {
+      setupApi(suggestions)
+      render(<App campaignId="ninja-naming" />)
 
-    expect(await screen.findAllByText(longAnswer)).toHaveLength(2)
+      expect(await screen.findAllByText(longAnswer)).toHaveLength(2)
 
-    const suggestionCard = document.querySelector('.suggestion-card')
-    const suggestionName = suggestionCard?.querySelector('.suggestion-card__name')
-    const leaderboardEntry = document.querySelector('.leaderboard-entry')
-    const leaderboardDetails = leaderboardEntry?.querySelector('.leaderboard-entry__details')
+      const suggestionCard = document.querySelector('.suggestion-card')
+      const suggestionName = suggestionCard?.querySelector('.suggestion-card__name')
+      const leaderboardEntry = document.querySelector('.leaderboard-entry')
+      const leaderboardDetails = leaderboardEntry?.querySelector('.leaderboard-entry__details')
 
-    expect(suggestionCard).not.toBeNull()
-    expect(suggestionName).not.toBeNull()
-    expect(leaderboardEntry).not.toBeNull()
-    expect(leaderboardDetails).not.toBeNull()
+      expect(suggestionCard).not.toBeNull()
+      expect(suggestionName).not.toBeNull()
+      expect(leaderboardEntry).not.toBeNull()
+      expect(leaderboardDetails).not.toBeNull()
 
-    expect(suggestionName).toBeVisible()
-    expect(leaderboardDetails).toBeVisible()
-    expect(getComputedStyle(suggestionCard as Element).flexWrap).toBe('wrap')
-    expect(getComputedStyle(suggestionName as Element).flexBasis).toBe('12rem')
-    expect(getComputedStyle(leaderboardEntry as Element).flexWrap).toBe('wrap')
-    expect(getComputedStyle(leaderboardDetails as Element).flexBasis).toBe('12rem')
+      expect(suggestionName).toBeVisible()
+      expect(leaderboardDetails).toBeVisible()
+      expect(getComputedStyle(suggestionCard as Element).flexWrap).toBe('wrap')
+      expect(getComputedStyle(suggestionName as Element).flexBasis).toBe('12rem')
+      expect(getComputedStyle(leaderboardEntry as Element).flexWrap).toBe('wrap')
+      expect(getComputedStyle(leaderboardDetails as Element).flexBasis).toBe('12rem')
+    } finally {
+      style.remove()
+    }
   })
 
   it('is not rendered when there are no suggestions', async () => {
