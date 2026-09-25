@@ -507,6 +507,42 @@ describe('VotingRules', () => {
       /4 of 4 total votes remaining/i,
     )
   })
+
+  it('hides redundant per-candidate and per-category limits when they match the total limit', async () => {
+    setupApi([], [], {
+      ...ninjaCampaign,
+      maxVotesTotal: 3,
+      maxVotesPerCandidate: 3,
+      maxVotesPerCategory: 3,
+    })
+    render(<App campaignId="ninja-naming" />)
+    await screen.findByRole('button', { name: /submit/i })
+
+    const rules = screen.getByRole('complementary', { name: /voting rules/i })
+    expect(rules).toHaveTextContent(/3 of 3 total votes remaining/i)
+    expect(rules).not.toHaveTextContent(/votes per candidate/i)
+    expect(rules).not.toHaveTextContent(/votes per category/i)
+  })
+
+  it('hides the per-category rule when a single-category campaign already shows the same total limit', async () => {
+    setupApi([], [], {
+      ...ninjaCampaign,
+      id: 'best-padeller-2026',
+      title: 'Best Padeller 2026',
+      maxVotesTotal: 3,
+      maxVotesPerCandidate: 2,
+      maxVotesPerCategory: 3,
+    }, [
+      { id: 'nominees', campaignId: 'best-padeller-2026', title: 'Nominees', description: 'desc', sortOrder: 1 },
+    ])
+    render(<App campaignId="best-padeller-2026" />)
+    await screen.findByRole('button', { name: /submit/i })
+
+    const rules = screen.getByRole('complementary', { name: /voting rules/i })
+    expect(rules).toHaveTextContent(/3 of 3 total votes remaining/i)
+    expect(rules).toHaveTextContent(/up to 2 votes per candidate/i)
+    expect(rules).not.toHaveTextContent(/votes per category/i)
+  })
 })
 
 describe('vote limit enforcement', () => {

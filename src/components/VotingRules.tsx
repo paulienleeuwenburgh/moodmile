@@ -12,16 +12,24 @@ export function VotingRules({
   votesUsed,
 }: VotingRulesProps) {
   const remaining = maxVotesTotal > 0 ? Math.max(0, maxVotesTotal - votesUsed) : null
+  const hidePerCandidateConstraint =
+    (maxVotesTotal > 0 &&
+      maxVotesPerCandidate > 0 &&
+      maxVotesPerCandidate === maxVotesTotal)
+  const hidePerCategoryConstraint =
+    maxVotesTotal > 0 &&
+    maxVotesPerCategory > 0 &&
+    maxVotesPerCategory === maxVotesTotal
 
   const constraints: string[] = []
-  if (maxVotesPerCandidate > 0) {
+  if (!hidePerCandidateConstraint && maxVotesPerCandidate > 0) {
     constraints.push(
       maxVotesPerCandidate === 1
         ? 'One vote per candidate'
         : `Up to ${maxVotesPerCandidate} votes per candidate`,
     )
   }
-  if (maxVotesPerCategory > 0) {
+  if (!hidePerCategoryConstraint && maxVotesPerCategory > 0) {
     constraints.push(
       maxVotesPerCategory === 1
         ? 'One vote per category'
