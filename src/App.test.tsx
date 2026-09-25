@@ -454,6 +454,18 @@ describe('leaderboard', () => {
     expect(after).toEqual(['Alpha', 'Beta'])
   })
 
+  it('keeps long wrapped answers visible in the board and leaderboard', async () => {
+    const longAnswer = 'A long answer that needs to wrap onto multiple lines to stay visible everywhere'
+    const suggestions: Suggestion[] = [
+      { id: 'long-answer', campaignId: 'ninja-naming', questionId: 'ninja-1', name: longAnswer, createdAt: '2024-01-01T00:00:00.000Z', votes: 1 },
+    ]
+
+    setupApi(suggestions)
+    render(<App campaignId="ninja-naming" />)
+
+    expect(await screen.findAllByText(longAnswer)).toHaveLength(2)
+  })
+
   it('is not rendered when there are no suggestions', async () => {
     setupApi()
     render(<App campaignId="ninja-naming" />)
