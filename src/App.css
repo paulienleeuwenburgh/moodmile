@@ -1493,10 +1493,10 @@
   text-align: left;
   padding: 0.5rem 0.75rem;
   border-bottom: 1px solid var(--color-border);
-  white-space: nowrap;
 }
 
 .admin-table th {
+  white-space: nowrap;
   font-weight: 700;
   color: var(--color-text-muted);
   background: var(--color-bg);
@@ -1507,6 +1507,8 @@
 
 .admin-table td {
   color: var(--color-text);
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .admin-table tr:last-child td {
