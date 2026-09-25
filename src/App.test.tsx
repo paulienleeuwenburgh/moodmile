@@ -851,6 +851,27 @@ describe('questions loaded from storage', () => {
   })
 })
 
+describe('suggestion board heading', () => {
+  it('hides "Suggestions by question" when there is only one question', async () => {
+    const singleQuestion: Question[] = [
+      { id: 'q-special', campaignId: 'ninja-naming', title: 'The Special Ninja', description: 'desc', sortOrder: 1 },
+    ]
+    setupApi([], [], ninjaCampaign, singleQuestion)
+    render(<App campaignId="ninja-naming" />)
+
+    await screen.findAllByText('The Special Ninja')
+
+    expect(screen.queryByRole('heading', { name: /suggestions by question/i })).not.toBeInTheDocument()
+  })
+
+  it('shows "Suggestions by question" when there is more than one question', async () => {
+    setupApi([], [], ninjaCampaign, ninjaQuestions)
+    render(<App campaignId="ninja-naming" />)
+
+    expect(await screen.findByRole('heading', { name: /suggestions by question/i })).toBeInTheDocument()
+  })
+})
+
 describe('suggestions and vote rules after campaign loaded from storage', () => {
   it('existing suggestions still work after loading campaign from storage', async () => {
     const existingSuggestion: Suggestion = {

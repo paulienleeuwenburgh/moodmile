@@ -19,11 +19,18 @@ export function SuggestionBoard({
   isVoteDisabled,
 }: SuggestionBoardProps) {
   const usesSingleVoteButton = campaign.maxVotesPerCandidate === 1
+  const hasMultipleQuestions = questions.length > 1
+  const boardTitle = campaign.allowSuggestions ? 'Suggestions by question' : 'Submissions by question'
+  const boardLabel = hasMultipleQuestions
+    ? boardTitle
+    : campaign.allowSuggestions
+      ? 'Suggestions'
+      : 'Submissions'
 
   return (
-    <section className="suggestion-board" aria-label={campaign.allowSuggestions ? 'Suggestions by question' : 'Submissions by question'}>
+    <section className="suggestion-board" aria-label={boardLabel}>
       <span className="section-eyebrow" aria-hidden="true">Submissions</span>
-      <h2>{campaign.allowSuggestions ? 'Suggestions by question' : 'Submissions by question'}</h2>
+      {hasMultipleQuestions && <h2>{boardTitle}</h2>}
       <div className="suggestion-board__grid">
         {questions.map((question) => {
           const questionSuggestions = suggestions
