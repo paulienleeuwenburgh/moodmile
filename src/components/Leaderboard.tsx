@@ -20,6 +20,7 @@ export function Leaderboard({
 }: LeaderboardProps) {
   const ranked = [...suggestions].sort((a, b) => b.votes - a.votes || a.createdAt.localeCompare(b.createdAt))
   const usesSingleVoteButton = campaign.maxVotesPerCandidate === 1
+  const showQuestionImages = questions.length > 1
 
   if (ranked.length === 0) {
     return null
@@ -57,7 +58,7 @@ export function Leaderboard({
                 <span className="leaderboard-entry__rank" aria-label={`Rank ${index + 1}`}>
                   {index + 1}
                 </span>
-                {question?.imageUrl && (
+                {showQuestionImages && question?.imageUrl && (
                   <img
                     src={question.imageUrl}
                     alt=""

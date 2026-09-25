@@ -20,6 +20,7 @@ export function SuggestionBoard({
 }: SuggestionBoardProps) {
   const usesSingleVoteButton = campaign.maxVotesPerCandidate === 1
   const hasMultipleQuestions = questions.length > 1
+  const showQuestionImages = hasMultipleQuestions
   const boardTitle = campaign.allowSuggestions ? 'Suggestions by question' : 'Submissions by question'
   const boardLabel = hasMultipleQuestions
     ? boardTitle
@@ -40,7 +41,7 @@ export function SuggestionBoard({
           return (
             <article key={question.id} className="suggestion-group">
               <header>
-                {question.imageUrl && (
+                {showQuestionImages && question.imageUrl && (
                   <img
                     src={question.imageUrl}
                     alt=""
