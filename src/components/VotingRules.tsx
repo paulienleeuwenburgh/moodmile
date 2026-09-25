@@ -20,7 +20,9 @@ export function VotingRules({
     maxVotesTotal === maxVotesPerCategory
   const hidePerCandidateConstraint =
     hideAllConstraints ||
-    (maxVotesPerCandidate === 1 && maxVotesPerCategory === 1)
+    (questionCount === 1 &&
+      maxVotesPerCandidate === 1 &&
+      maxVotesPerCategory === 1)
   const hidePerCategoryConstraint =
     hideAllConstraints ||
     (questionCount === 1 &&
