@@ -2,6 +2,7 @@ interface VotingRulesProps {
   maxVotesTotal: number
   maxVotesPerCategory: number
   maxVotesPerCandidate: number
+  questionCount: number
   votesUsed: number
 }
 
@@ -9,23 +10,33 @@ export function VotingRules({
   maxVotesTotal,
   maxVotesPerCategory,
   maxVotesPerCandidate,
+  questionCount,
   votesUsed,
 }: VotingRulesProps) {
   const remaining = maxVotesTotal > 0 ? Math.max(0, maxVotesTotal - votesUsed) : null
-  const hideRedundantConstraints =
+  const hideAllConstraints =
     maxVotesTotal > 0 &&
     maxVotesTotal === maxVotesPerCandidate &&
     maxVotesTotal === maxVotesPerCategory
+  const hidePerCandidateConstraint =
+    hideAllConstraints ||
+    (maxVotesPerCandidate === 1 && maxVotesPerCategory === 1)
+  const hidePerCategoryConstraint =
+    hideAllConstraints ||
+    (questionCount === 1 &&
+      maxVotesTotal > 0 &&
+      maxVotesPerCategory > 0 &&
+      maxVotesPerCategory === maxVotesTotal)
 
   const constraints: string[] = []
-  if (!hideRedundantConstraints && maxVotesPerCandidate > 0) {
+  if (!hidePerCandidateConstraint && maxVotesPerCandidate > 0) {
     constraints.push(
       maxVotesPerCandidate === 1
         ? 'One vote per candidate'
         : `Up to ${maxVotesPerCandidate} votes per candidate`,
     )
   }
-  if (!hideRedundantConstraints && maxVotesPerCategory > 0) {
+  if (!hidePerCategoryConstraint && maxVotesPerCategory > 0) {
     constraints.push(
       maxVotesPerCategory === 1
         ? 'One vote per category'
