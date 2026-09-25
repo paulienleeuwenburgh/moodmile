@@ -67,10 +67,12 @@ export function Leaderboard({
                     onError={handleImageError}
                   />
                 )}
-                <span className="leaderboard-entry__name">{suggestion.name}</span>
-                {question && (
-                  <span className="leaderboard-entry__mascot-title">{question.title}</span>
-                )}
+                <div className="leaderboard-entry__details">
+                  <span className="leaderboard-entry__name">{suggestion.name}</span>
+                  {question && (
+                    <span className="leaderboard-entry__mascot-title">{question.title}</span>
+                  )}
+                </div>
                 <div className="vote-actions">
                   <button
                     type="button"
