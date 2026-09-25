@@ -694,6 +694,9 @@
   font-weight: 700;
   color: var(--color-text);
   letter-spacing: -0.01em;
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .suggestion-group ul {
@@ -757,7 +760,7 @@
   font-weight: 500;
   font-size: 0.875rem;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 0.5rem;
   min-width: 0;
@@ -772,9 +775,8 @@
 .suggestion-card__name {
   flex: 1;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 /* ══ Vote actions ═════════════════════════════════════════════════════════════ */
@@ -862,7 +864,7 @@
   padding: 0.75rem 1rem;
   box-shadow: var(--shadow-card);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.75rem;
   transition: transform 0.14s ease, box-shadow 0.14s ease;
 }
@@ -900,23 +902,27 @@
   flex-shrink: 0;
 }
 
-.leaderboard-entry__name {
+.leaderboard-entry__details {
   flex: 1;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.leaderboard-entry__name {
   font-weight: 600;
   font-size: 0.9375rem;
   color: var(--color-text);
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .leaderboard-entry__mascot-title {
   font-size: 0.73rem;
   font-weight: 600;
   color: var(--color-text-muted);
-  white-space: nowrap;
-  flex-shrink: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
   background: var(--color-tag-bg);
   padding: 0.2rem 0.5rem;
   border-radius: 20px;
