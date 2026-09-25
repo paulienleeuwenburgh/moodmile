@@ -14,21 +14,17 @@ export function VotingRules({
   votesUsed,
 }: VotingRulesProps) {
   const remaining = maxVotesTotal > 0 ? Math.max(0, maxVotesTotal - votesUsed) : null
-  const hideAllConstraints =
-    maxVotesTotal > 0 &&
-    maxVotesTotal === maxVotesPerCandidate &&
-    maxVotesTotal === maxVotesPerCategory
   const hidePerCandidateConstraint =
-    hideAllConstraints ||
+    (maxVotesTotal > 0 &&
+      maxVotesPerCandidate > 0 &&
+      maxVotesPerCandidate === maxVotesTotal) ||
     (questionCount === 1 &&
       maxVotesPerCandidate === 1 &&
       maxVotesPerCategory === 1)
   const hidePerCategoryConstraint =
-    hideAllConstraints ||
-    (questionCount === 1 &&
-      maxVotesTotal > 0 &&
-      maxVotesPerCategory > 0 &&
-      maxVotesPerCategory === maxVotesTotal)
+    maxVotesTotal > 0 &&
+    maxVotesPerCategory > 0 &&
+    maxVotesPerCategory === maxVotesTotal
 
   const constraints: string[] = []
   if (!hidePerCandidateConstraint && maxVotesPerCandidate > 0) {
