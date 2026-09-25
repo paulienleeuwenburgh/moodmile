@@ -1,8 +1,14 @@
+/// <reference types="node" />
+import { readFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import type { Campaign, Question, Suggestion } from './types'
+
+const appStyles = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), 'App.css'), 'utf8')
 
 // ---------------------------------------------------------------------------
 // Mock the API module so tests never make real HTTP calls
@@ -464,6 +470,21 @@ describe('leaderboard', () => {
     render(<App campaignId="ninja-naming" />)
 
     expect(await screen.findAllByText(longAnswer)).toHaveLength(2)
+
+    const suggestionCard = document.querySelector('.suggestion-card')
+    const suggestionName = suggestionCard?.querySelector('.suggestion-card__name')
+    const leaderboardEntry = document.querySelector('.leaderboard-entry')
+    const leaderboardDetails = leaderboardEntry?.querySelector('.leaderboard-entry__details')
+
+    expect(suggestionCard).not.toBeNull()
+    expect(suggestionName).not.toBeNull()
+    expect(leaderboardEntry).not.toBeNull()
+    expect(leaderboardDetails).not.toBeNull()
+
+    expect(appStyles).toMatch(/\.suggestion-card\s*\{[^}]*flex-wrap:\s*wrap;/s)
+    expect(appStyles).toMatch(/\.suggestion-card__name\s*\{[^}]*flex:\s*1 1 12rem;/s)
+    expect(appStyles).toMatch(/\.leaderboard-entry\s*\{[^}]*flex-wrap:\s*wrap;/s)
+    expect(appStyles).toMatch(/\.leaderboard-entry__details\s*\{[^}]*flex:\s*1 1 12rem;/s)
   })
 
   it('is not rendered when there are no suggestions', async () => {
