@@ -465,6 +465,9 @@ describe('leaderboard', () => {
     const suggestions: Suggestion[] = [
       { id: 'long-answer', campaignId: 'ninja-naming', questionId: 'ninja-1', name: longAnswer, createdAt: '2024-01-01T00:00:00.000Z', votes: 1 },
     ]
+    const style = document.createElement('style')
+    style.textContent = appStyles
+    document.head.appendChild(style)
 
     setupApi(suggestions)
     render(<App campaignId="ninja-naming" />)
@@ -481,10 +484,12 @@ describe('leaderboard', () => {
     expect(leaderboardEntry).not.toBeNull()
     expect(leaderboardDetails).not.toBeNull()
 
-    expect(appStyles).toMatch(/\.suggestion-card\s*\{[^}]*flex-wrap:\s*wrap;/s)
-    expect(appStyles).toMatch(/\.suggestion-card__name\s*\{[^}]*flex:\s*1 1 12rem;/s)
-    expect(appStyles).toMatch(/\.leaderboard-entry\s*\{[^}]*flex-wrap:\s*wrap;/s)
-    expect(appStyles).toMatch(/\.leaderboard-entry__details\s*\{[^}]*flex:\s*1 1 12rem;/s)
+    expect(suggestionName).toBeVisible()
+    expect(leaderboardDetails).toBeVisible()
+    expect(getComputedStyle(suggestionCard as Element).flexWrap).toBe('wrap')
+    expect(getComputedStyle(suggestionName as Element).flexBasis).toBe('12rem')
+    expect(getComputedStyle(leaderboardEntry as Element).flexWrap).toBe('wrap')
+    expect(getComputedStyle(leaderboardDetails as Element).flexBasis).toBe('12rem')
   })
 
   it('is not rendered when there are no suggestions', async () => {
