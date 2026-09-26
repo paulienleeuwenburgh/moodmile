@@ -417,6 +417,19 @@ describe('input validation', () => {
     await userEvent.type(input, 'Good 😊')
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
+
+  it('shows an error when the backend rejects a duplicate submission', async () => {
+    setupApi()
+    mockPostSuggestion.mockResolvedValueOnce(null)
+    render(<App campaignId="ninja-naming" />)
+
+    await submitSuggestion('Already there')
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'That answer has already been submitted for this question.',
+    )
+    expect(getSuggestionNames()).toHaveLength(0)
+  })
 })
 
 describe('leaderboard', () => {

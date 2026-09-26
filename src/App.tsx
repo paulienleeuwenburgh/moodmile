@@ -19,6 +19,7 @@ interface AppProps {
 
 const STALE_DATA_MESSAGE =
   "This candidate no longer exists. Your data may be out of date. Please click 'Refresh Data' to retrieve the latest information."
+const DUPLICATE_SUGGESTION_MESSAGE = 'That answer has already been submitted for this question.'
 
 function formatLastUpdated(timestamp: string): string {
   return new Intl.DateTimeFormat(undefined, {
@@ -106,6 +107,8 @@ function App({ campaignId }: AppProps) {
       return
     }
 
+    setActionError(null)
+
     // Client-side duplicate guard (UX): normalise and skip if already present
     const isDuplicate = suggestions.some(
       (s) =>
@@ -113,6 +116,7 @@ function App({ campaignId }: AppProps) {
         s.name.trim().toLowerCase() === name.trim().toLowerCase(),
     )
     if (isDuplicate) {
+      setActionError(DUPLICATE_SUGGESTION_MESSAGE)
       return
     }
 
@@ -138,6 +142,7 @@ function App({ campaignId }: AppProps) {
         } else {
           // Backend rejected (e.g. race-condition duplicate) — remove optimistic entry
           setSuggestions((current) => current.filter((s) => s.id !== tempId))
+          setActionError(DUPLICATE_SUGGESTION_MESSAGE)
         }
       })
       .catch((err: unknown) => {

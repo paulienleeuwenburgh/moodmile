@@ -76,7 +76,9 @@ async function postSuggestion(
   // Duplicate check: normalise to lowercase and compare
   const normalised = name.toLowerCase()
   for await (const entity of client.listEntities<SuggestionEntity>({
-    queryOptions: { filter: `PartitionKey eq '${escapeODataString(partitionKey)}'` },
+    queryOptions: {
+      filter: `PartitionKey eq '${escapeODataString(partitionKey)}' and isDeleted ne true`,
+    },
   })) {
     if (entity.name.trim().toLowerCase() === normalised) {
       return {
