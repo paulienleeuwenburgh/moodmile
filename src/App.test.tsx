@@ -923,7 +923,7 @@ describe('suggestion board heading', () => {
 
     await screen.findByText('Only the description should appear in the card.')
 
-    const questionCard = document.querySelector('.question-card')
+    const questionCard = document.querySelector('.question-card') as HTMLElement | null
     expect(questionCard).not.toBeNull()
     expect(within(questionCard!).queryByRole('heading', { name: 'The Special Ninja' })).not.toBeInTheDocument()
     expect(within(questionCard!).getByText('Only the description should appear in the card.')).toBeInTheDocument()
