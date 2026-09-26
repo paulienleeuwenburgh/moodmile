@@ -334,6 +334,7 @@ function App({ campaignId }: AppProps) {
             question={question}
             isSelected={selectedQuestionId === question.id}
             onSelect={setSelectedQuestionId}
+            hideTitle={questions.length === 1}
           />
         ))}
       </section>

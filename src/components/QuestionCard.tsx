@@ -8,6 +8,7 @@ interface QuestionCardProps {
   question: Question
   isSelected: boolean
   onSelect: (questionId: string) => void
+  hideTitle?: boolean
 }
 
 // 0.9 ~= 9:10; anything narrower is treated as portrait.
@@ -15,9 +16,11 @@ const PORTRAIT_RATIO_THRESHOLD = 0.9
 // Up to 1.15 keeps near-square images out of the wide landscape treatment.
 const SQUARE_RATIO_THRESHOLD = 1.15
 
-export function QuestionCard({ question, isSelected, onSelect }: QuestionCardProps) {
+export function QuestionCard({ question, isSelected, onSelect, hideTitle = false }: QuestionCardProps) {
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [imageVariant, setImageVariant] = useState<'landscape' | 'portrait' | 'square'>('landscape')
+  const shouldShowTitle = !hideTitle
+  const shouldShowDescription = question.description.trim().length > 0
 
   function handleImageLoad(event: SyntheticEvent<HTMLImageElement>) {
     const { naturalWidth, naturalHeight } = event.currentTarget
@@ -72,10 +75,12 @@ export function QuestionCard({ question, isSelected, onSelect }: QuestionCardPro
           onClick={() => onSelect(question.id)}
           aria-pressed={isSelected}
         >
-          <div className="question-card__body">
-            <h3>{question.title}</h3>
-            <p>{question.description}</p>
-          </div>
+          {(shouldShowTitle || shouldShowDescription) && (
+            <div className="question-card__body">
+              {shouldShowTitle && <h3>{question.title}</h3>}
+              {shouldShowDescription && <p>{question.description}</p>}
+            </div>
+          )}
         </button>
       </article>
 

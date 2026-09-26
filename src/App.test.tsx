@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
@@ -907,6 +907,29 @@ describe('questions loaded from storage', () => {
 })
 
 describe('suggestion board heading', () => {
+  it('hides the question card title for single-question campaigns while keeping the description', async () => {
+    const singleQuestion: Question[] = [
+      {
+        id: 'q-special',
+        campaignId: 'ninja-naming',
+        title: 'The Special Ninja',
+        description: 'Only the description should appear in the card.',
+        imageUrl: '/special-ninja.png',
+        sortOrder: 1,
+      },
+    ]
+    setupApi([], [], ninjaCampaign, singleQuestion)
+    render(<App campaignId="ninja-naming" />)
+
+    await screen.findByText('Only the description should appear in the card.')
+
+    const questionCard = document.querySelector('.question-card') as HTMLElement | null
+    expect(questionCard).not.toBeNull()
+    expect(within(questionCard!).queryByRole('heading', { name: 'The Special Ninja' })).not.toBeInTheDocument()
+    expect(within(questionCard!).getByText('Only the description should appear in the card.')).toBeInTheDocument()
+    expect(questionCard!.querySelector('img')).toHaveAttribute('src', '/special-ninja.png')
+  })
+
   it('hides "Suggestions by question" when there is only one question', async () => {
     const singleQuestion: Question[] = [
       { id: 'q-special', campaignId: 'ninja-naming', title: 'The Special Ninja', description: 'desc', sortOrder: 1 },
