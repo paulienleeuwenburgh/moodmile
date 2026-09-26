@@ -394,6 +394,7 @@ describe('input validation', () => {
   it('shows the remaining character count under the answer input', async () => {
     setupApi()
     render(<App campaignId="ninja-naming" />)
+    await screen.findByRole('textbox', { name: /your answer/i })
     expect(screen.getByText('250 characters left')).toBeInTheDocument()
     await typeInSuggestion('Good 😊')
     expect(screen.getByText('244 characters left')).toBeInTheDocument()
