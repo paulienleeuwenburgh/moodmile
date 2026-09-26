@@ -930,6 +930,26 @@ describe('suggestion board heading', () => {
     expect(questionCard!.querySelector('img')).toHaveAttribute('src', '/special-ninja.png')
   })
 
+  it('still renders single-question campaigns when the question description is missing', async () => {
+    const singleQuestion = [
+      {
+        id: 'q-special',
+        campaignId: 'ninja-naming',
+        title: 'The Special Ninja',
+        description: undefined,
+        sortOrder: 1,
+      },
+    ] as unknown as Question[]
+
+    setupApi([], [], ninjaCampaign, singleQuestion)
+    render(<App campaignId="ninja-naming" />)
+
+    await screen.findByText('These four ninjas need names')
+
+    expect(screen.getByRole('heading', { name: /share your thoughts/i })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: /suggestions/i })).toBeInTheDocument()
+  })
+
   it('hides "Suggestions by question" when there is only one question', async () => {
     const singleQuestion: Question[] = [
       { id: 'q-special', campaignId: 'ninja-naming', title: 'The Special Ninja', description: 'desc', sortOrder: 1 },

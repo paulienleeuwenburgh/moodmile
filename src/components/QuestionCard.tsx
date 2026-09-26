@@ -20,7 +20,8 @@ export function QuestionCard({ question, isSelected, onSelect, hideTitle = false
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [imageVariant, setImageVariant] = useState<'landscape' | 'portrait' | 'square'>('landscape')
   const shouldShowTitle = !hideTitle
-  const shouldShowDescription = question.description.trim().length > 0
+  const description = typeof question.description === 'string' ? question.description.trim() : ''
+  const shouldShowDescription = description.length > 0
 
   function handleImageLoad(event: SyntheticEvent<HTMLImageElement>) {
     const { naturalWidth, naturalHeight } = event.currentTarget
@@ -78,7 +79,7 @@ export function QuestionCard({ question, isSelected, onSelect, hideTitle = false
           {(shouldShowTitle || shouldShowDescription) && (
             <div className="question-card__body">
               {shouldShowTitle && <h3>{question.title}</h3>}
-              {shouldShowDescription && <p>{question.description}</p>}
+              {shouldShowDescription && <p>{description}</p>}
             </div>
           )}
         </button>
