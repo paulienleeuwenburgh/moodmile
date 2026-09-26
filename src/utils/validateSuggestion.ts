@@ -2,7 +2,7 @@ export const SUGGESTION_MAX_LENGTH = 250
 
 const INVALID_MARKUP_REGEX = /[<>]/u
 
-function countSuggestionCharacters(value: string): number {
+export function countSuggestionCharacters(value: string): number {
   return Array.from(value).length
 }
 

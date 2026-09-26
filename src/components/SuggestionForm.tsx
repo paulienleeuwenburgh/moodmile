@@ -1,7 +1,11 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import type { Question } from '../types'
-import { validateSuggestion } from '../utils/validateSuggestion'
+import {
+  countSuggestionCharacters,
+  SUGGESTION_MAX_LENGTH,
+  validateSuggestion,
+} from '../utils/validateSuggestion'
 
 interface SuggestionFormProps {
   questions: Question[]
@@ -18,6 +22,13 @@ export function SuggestionForm({
 }: SuggestionFormProps) {
   const [suggestion, setSuggestion] = useState('')
   const [validationError, setValidationError] = useState('')
+  const remainingCharacters = SUGGESTION_MAX_LENGTH - countSuggestionCharacters(suggestion)
+  const characterCountMessage = remainingCharacters < 0
+    ? `${Math.abs(remainingCharacters)} character${Math.abs(remainingCharacters) === 1 ? '' : 's'} over limit`
+    : `${remainingCharacters} character${remainingCharacters === 1 ? '' : 's'} left`
+  const describedBy = validationError
+    ? 'name-suggestion-count name-suggestion-error'
+    : 'name-suggestion-count'
 
   const handleChange = (value: string) => {
     setSuggestion(value)
@@ -66,9 +77,15 @@ export function SuggestionForm({
           value={suggestion}
           onChange={(event) => handleChange(event.target.value)}
           placeholder="e.g. Sunny Stride"
-          aria-describedby={validationError ? 'name-suggestion-error' : undefined}
+          aria-describedby={describedBy}
           aria-invalid={!!validationError}
         />
+        <span
+          id="name-suggestion-count"
+          className={`suggestion-form__count${remainingCharacters < 0 ? ' suggestion-form__count--invalid' : ''}`}
+        >
+          {characterCountMessage}
+        </span>
         {validationError && (
           <span id="name-suggestion-error" className="suggestion-form__error" role="alert">
             {validationError}
