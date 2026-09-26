@@ -19,9 +19,8 @@ const SQUARE_RATIO_THRESHOLD = 1.15
 export function QuestionCard({ question, isSelected, onSelect, hideTitle = false }: QuestionCardProps) {
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [imageVariant, setImageVariant] = useState<'landscape' | 'portrait' | 'square'>('landscape')
-  const description = question.description.trim()
   const shouldShowTitle = !hideTitle
-  const shouldShowDescription = description.length > 0
+  const shouldShowDescription = question.description.trim().length > 0
 
   function handleImageLoad(event: SyntheticEvent<HTMLImageElement>) {
     const { naturalWidth, naturalHeight } = event.currentTarget
@@ -79,7 +78,7 @@ export function QuestionCard({ question, isSelected, onSelect, hideTitle = false
           {(shouldShowTitle || shouldShowDescription) && (
             <div className="question-card__body">
               {shouldShowTitle && <h3>{question.title}</h3>}
-              {shouldShowDescription && <p>{description}</p>}
+              {shouldShowDescription && <p>{question.description}</p>}
             </div>
           )}
         </button>
