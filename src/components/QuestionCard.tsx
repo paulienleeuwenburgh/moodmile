@@ -20,7 +20,7 @@ export function QuestionCard({ question, isSelected, onSelect, hideTitle = false
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [imageVariant, setImageVariant] = useState<'landscape' | 'portrait' | 'square'>('landscape')
   const shouldShowTitle = !hideTitle
-  const shouldShowDescription = !hideTitle || question.description.trim().length > 0
+  const shouldShowDescription = question.description.trim().length > 0
 
   function handleImageLoad(event: SyntheticEvent<HTMLImageElement>) {
     const { naturalWidth, naturalHeight } = event.currentTarget
