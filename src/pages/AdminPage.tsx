@@ -267,8 +267,7 @@ export function AdminPage() {
 
   async function handleDownloadExport() {
     try {
-      const blob = await adminDownloadCampaignExport(secret, campaignId)
-      const fileName = `${campaignId}-export.json`
+      const { blob, fileName } = await adminDownloadCampaignExport(secret, campaignId)
       const downloadUrl = URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = downloadUrl
@@ -276,7 +275,7 @@ export function AdminPage() {
       document.body.appendChild(link)
       link.click()
       link.remove()
-      URL.revokeObjectURL(downloadUrl)
+      setTimeout(() => URL.revokeObjectURL(downloadUrl), 0)
       showSuccess(`Export downloaded for "${campaign?.title}".`)
     } catch (err) {
       showError(getAdminErrorMessage(err, 'Export failed.'))

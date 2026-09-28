@@ -149,10 +149,16 @@ export async function fetchDeletedSuggestions(
 export async function adminDownloadCampaignExport(
   adminSecret: string,
   campaignId: string,
-): Promise<Blob> {
+): Promise<{ blob: Blob; fileName: string }> {
   const response = await apiFetchResponse(
     `/mgmt/campaigns/${encodeURIComponent(campaignId)}/export`,
     { headers: { 'X-Admin-Secret': adminSecret } },
   )
-  return response.blob()
+  const contentDisposition = response.headers.get('Content-Disposition') ?? ''
+  const fileNameMatch = contentDisposition.match(/filename="([^"]+)"/i)
+  const fileName = fileNameMatch?.[1] ?? `${campaignId}-export.json`
+  return {
+    blob: await response.blob(),
+    fileName,
+  }
 }

@@ -11,7 +11,7 @@ const mockFetchDeletedSuggestions = vi.fn<
   (adminSecret: string, campaignId: string) => Promise<(Suggestion & { deletedAt?: string; deletedBy?: string; deleteReason?: string })[]>
 >()
 const mockAdminDownloadCampaignExport = vi.fn<
-  (adminSecret: string, campaignId: string) => Promise<Blob>
+  (adminSecret: string, campaignId: string) => Promise<{ blob: Blob; fileName: string }>
 >()
 
 vi.mock('../api', () => ({
@@ -73,7 +73,10 @@ describe('AdminPage document title', () => {
     ])
     mockFetchSuggestions.mockResolvedValue([])
     mockFetchDeletedSuggestions.mockResolvedValue([])
-    mockAdminDownloadCampaignExport.mockResolvedValue(new Blob(['{}'], { type: 'application/json' }))
+    mockAdminDownloadCampaignExport.mockResolvedValue({
+      blob: new Blob(['{}'], { type: 'application/json' }),
+      fileName: 'ninja-naming-export-2026-09-28.json',
+    })
   })
 
   afterEach(() => {
@@ -126,18 +129,22 @@ describe('AdminPage document title', () => {
   })
 
   it('downloads a campaign export from the admin portal', async () => {
+    vi.useFakeTimers()
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
     render(<AdminPage />)
 
-    await userEvent.type(screen.getByLabelText(/admin secret/i), 'secret')
-    await userEvent.click(screen.getByRole('button', { name: /load campaign/i }))
+    await user.type(screen.getByLabelText(/admin secret/i), 'secret')
+    await user.click(screen.getByRole('button', { name: /load campaign/i }))
     await screen.findByText('Admin access granted')
 
-    await userEvent.click(screen.getByRole('button', { name: /download export/i }))
+    await user.click(screen.getByRole('button', { name: /download export/i }))
+    await vi.runAllTimersAsync()
 
     expect(mockAdminDownloadCampaignExport).toHaveBeenCalledWith('secret', 'ninja-naming')
     expect(createObjectUrl).toHaveBeenCalledOnce()
     expect(clickSpy).toHaveBeenCalledOnce()
     expect(revokeObjectUrl).toHaveBeenCalledWith('blob:download')
     expect(await screen.findByRole('status')).toHaveTextContent('Export downloaded for "Best Padeller 2026".')
+    vi.useRealTimers()
   })
 })
