@@ -12,12 +12,17 @@ export class ApiError extends Error {
   }
 }
 
-async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+async function apiFetchResponse(path: string, init?: RequestInit): Promise<Response> {
   const response = await fetch(`${BASE}${path}`, init)
   if (!response.ok) {
     const body = await response.json().catch(() => ({}))
     throw new ApiError(response.status, (body as { error?: string }).error ?? `HTTP ${response.status}`)
   }
+  return response
+}
+
+async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await apiFetchResponse(path, init)
   return response.json() as Promise<T>
 }
 
@@ -82,6 +87,34 @@ function adminHeaders(adminSecret: string): Record<string, string> {
   return { 'Content-Type': 'application/json', 'X-Admin-Secret': adminSecret }
 }
 
+function decodeLatin1PercentEncoded(value: string): string {
+  return value.replace(/%([0-9a-f]{2})/gi, (_, hex: string) => String.fromCharCode(parseInt(hex, 16)))
+}
+
+function getDownloadFileName(contentDisposition: string, fallback: string): string {
+  const fileNameStarMatch = contentDisposition.match(/filename\*\s*=\s*([^;]+)/i)
+  if (fileNameStarMatch) {
+    const rawValue = fileNameStarMatch[1]?.trim()
+    const starValue = rawValue?.replace(/^"|"$/g, '')
+    const rfc5987Match = starValue?.match(/^([^']*)'[^']*'(.*)$/)
+    if (rfc5987Match) {
+      const [, charset, encodedValue] = rfc5987Match
+      if (charset.toLowerCase() === 'iso-8859-1') {
+        return decodeLatin1PercentEncoded(encodedValue)
+      }
+      try {
+        return decodeURIComponent(encodedValue)
+      } catch {
+        return encodedValue
+      }
+    }
+    if (starValue) return starValue
+  }
+
+  const fileNameMatch = contentDisposition.match(/filename\s*=\s*("?)([^";]+)\1/i)
+  return fileNameMatch?.[2]?.trim() || fallback
+}
+
 export async function adminDeleteSuggestion(
   adminSecret: string,
   campaignId: string,
@@ -139,4 +172,20 @@ export async function fetchDeletedSuggestions(
     `/mgmt/suggestions?campaignId=${encodeURIComponent(campaignId)}`,
     { headers: { 'X-Admin-Secret': adminSecret } },
   )
+}
+
+export async function adminDownloadCampaignExport(
+  adminSecret: string,
+  campaignId: string,
+): Promise<{ blob: Blob; fileName: string }> {
+  const response = await apiFetchResponse(
+    `/mgmt/campaigns/${encodeURIComponent(campaignId)}/export`,
+    { headers: { 'X-Admin-Secret': adminSecret } },
+  )
+  const contentDisposition = response.headers.get('Content-Disposition') ?? ''
+  const fileName = getDownloadFileName(contentDisposition, `${campaignId}-export.json`)
+  return {
+    blob: await response.blob(),
+    fileName,
+  }
 }
