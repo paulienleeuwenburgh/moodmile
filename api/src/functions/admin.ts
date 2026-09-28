@@ -159,6 +159,23 @@ function getSessionIdFromVotePartitionKey(campaignId: string, partitionKey: stri
   return partitionKey.startsWith(prefix) ? partitionKey.slice(prefix.length) : ''
 }
 
+function getSuggestionIdForExport(
+  entity: VoteEntity,
+  suggestionMetadata: Map<string, { questionId: string; name: string; isDeleted: boolean }>,
+): string {
+  if (entity.suggestionId) {
+    return String(entity.suggestionId)
+  }
+
+  const rowKey = String(entity.rowKey ?? '')
+  if (suggestionMetadata.has(rowKey)) {
+    return rowKey
+  }
+
+  const prefixCandidate = rowKey.split('|')[0] ?? rowKey
+  return suggestionMetadata.has(prefixCandidate) ? prefixCandidate : rowKey
+}
+
 export async function exportCampaignData(
   request: HttpRequest,
   _context: InvocationContext,
@@ -223,7 +240,7 @@ export async function exportCampaignData(
   for await (const entity of votesClient.listEntities<VoteEntity>({
     queryOptions: { filter: voteFilter },
   })) {
-    const suggestionId = String(entity.suggestionId ?? String(entity.rowKey).split('|')[0] ?? '')
+    const suggestionId = getSuggestionIdForExport(entity, suggestionMetadata)
     const metadata = suggestionMetadata.get(suggestionId)
     const questionId = String(entity.questionId ?? metadata?.questionId ?? '')
     votes.push({

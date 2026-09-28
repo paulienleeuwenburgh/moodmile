@@ -276,7 +276,7 @@ export function AdminPage() {
       link.click()
       link.remove()
       setTimeout(() => URL.revokeObjectURL(downloadUrl), 0)
-      showSuccess(`Export downloaded for "${campaign?.title}".`)
+      showSuccess(`Export download started for "${campaign?.title}".`)
     } catch (err) {
       showError(getAdminErrorMessage(err, 'Export failed.'))
     }

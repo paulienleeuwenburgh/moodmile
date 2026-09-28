@@ -142,6 +142,6 @@ describe('AdminPage document title', () => {
     expect(createObjectUrl).toHaveBeenCalledOnce()
     expect(clickSpy).toHaveBeenCalledOnce()
     await waitFor(() => expect(revokeObjectUrl).toHaveBeenCalledWith('blob:download'))
-    expect(await screen.findByRole('status')).toHaveTextContent('Export downloaded for "Best Padeller 2026".')
+    expect(await screen.findByRole('status')).toHaveTextContent('Export download started for "Best Padeller 2026".')
   })
 })
