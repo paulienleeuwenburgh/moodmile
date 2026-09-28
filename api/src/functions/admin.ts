@@ -159,7 +159,7 @@ function getSessionIdFromVotePartitionKey(campaignId: string, partitionKey: stri
   return partitionKey.startsWith(prefix) ? partitionKey.slice(prefix.length) : ''
 }
 
-async function exportCampaignData(
+export async function exportCampaignData(
   request: HttpRequest,
   _context: InvocationContext,
 ): Promise<HttpResponseInit> {

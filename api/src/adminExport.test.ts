@@ -72,11 +72,15 @@ vi.mock('./campaigns', () => ({
   getCampaign: mockGetCampaign,
 }))
 
-import './functions/admin'
+import { exportCampaignData } from './functions/admin'
 
 describe('admin campaign export', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
+    mockEnsureTableExists.mockReset()
+    mockGetCampaign.mockReset()
+    mockListQuestions.mockReset()
+    mockListSuggestions.mockReset()
+    mockListVotes.mockReset()
     process.env.ADMIN_SECRET = 'secret'
     mockEnsureTableExists.mockResolvedValue(undefined)
     mockGetCampaign.mockResolvedValue({
@@ -160,8 +164,7 @@ describe('admin campaign export', () => {
   })
 
   it('exports campaign metadata, submissions, and votes as a downloadable JSON file', async () => {
-    const [, routeConfig] = mockAppHttp.mock.calls.find(([name]) => name === 'adminExportCampaignData') ?? []
-    const response = await routeConfig.handler(
+    const response = await exportCampaignData(
       {
         params: { campaignId: 'best-padeller-2026' },
         headers: { get: (name: string) => (name.toLowerCase() === 'x-admin-secret' ? 'secret' : null) },
