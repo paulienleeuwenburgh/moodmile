@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AdminPage } from './AdminPage'
@@ -129,8 +129,7 @@ describe('AdminPage document title', () => {
   })
 
   it('downloads a campaign export from the admin portal', async () => {
-    vi.useFakeTimers()
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    const user = userEvent.setup()
     render(<AdminPage />)
 
     await user.type(screen.getByLabelText(/admin secret/i), 'secret')
@@ -138,13 +137,11 @@ describe('AdminPage document title', () => {
     await screen.findByText('Admin access granted')
 
     await user.click(screen.getByRole('button', { name: /download export/i }))
-    await vi.runAllTimersAsync()
 
     expect(mockAdminDownloadCampaignExport).toHaveBeenCalledWith('secret', 'ninja-naming')
     expect(createObjectUrl).toHaveBeenCalledOnce()
     expect(clickSpy).toHaveBeenCalledOnce()
-    expect(revokeObjectUrl).toHaveBeenCalledWith('blob:download')
+    await waitFor(() => expect(revokeObjectUrl).toHaveBeenCalledWith('blob:download'))
     expect(await screen.findByRole('status')).toHaveTextContent('Export downloaded for "Best Padeller 2026".')
-    vi.useRealTimers()
   })
 })
