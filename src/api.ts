@@ -87,18 +87,28 @@ function adminHeaders(adminSecret: string): Record<string, string> {
   return { 'Content-Type': 'application/json', 'X-Admin-Secret': adminSecret }
 }
 
+function decodeLatin1PercentEncoded(value: string): string {
+  return value.replace(/%([0-9a-f]{2})/gi, (_, hex: string) => String.fromCharCode(parseInt(hex, 16)))
+}
+
 function getDownloadFileName(contentDisposition: string, fallback: string): string {
   const fileNameStarMatch = contentDisposition.match(/filename\*\s*=\s*([^;]+)/i)
   if (fileNameStarMatch) {
     const rawValue = fileNameStarMatch[1]?.trim()
-    const encodedValue = rawValue?.replace(/^UTF-8''/i, '').replace(/^"|"$/g, '')
-    if (encodedValue) {
+    const starValue = rawValue?.replace(/^"|"$/g, '')
+    const rfc5987Match = starValue?.match(/^([^']*)'[^']*'(.*)$/)
+    if (rfc5987Match) {
+      const [, charset, encodedValue] = rfc5987Match
+      if (charset.toLowerCase() === 'iso-8859-1') {
+        return decodeLatin1PercentEncoded(encodedValue)
+      }
       try {
         return decodeURIComponent(encodedValue)
       } catch {
         return encodedValue
       }
     }
+    if (starValue) return starValue
   }
 
   const fileNameMatch = contentDisposition.match(/filename\s*=\s*("?)([^";]+)\1/i)

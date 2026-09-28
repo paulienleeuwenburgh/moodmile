@@ -159,6 +159,10 @@ function getSessionIdFromVotePartitionKey(campaignId: string, partitionKey: stri
   return partitionKey.startsWith(prefix) ? partitionKey.slice(prefix.length) : ''
 }
 
+function getEntityPartitionKey(entity: VoteEntity): string {
+  return String((entity as VoteEntity & { PartitionKey?: string }).partitionKey ?? (entity as { PartitionKey?: string }).PartitionKey ?? '')
+}
+
 function getSuggestionIdForExport(
   entity: VoteEntity,
   suggestionMetadata: Map<string, { questionId: string; name: string; isDeleted: boolean }>,
@@ -249,7 +253,7 @@ export async function exportCampaignData(
       questionTitle: questionTitles.get(questionId) ?? questionId,
       suggestionId,
       suggestionName: metadata?.name ?? '',
-      sessionId: getSessionIdFromVotePartitionKey(campaignId, String(entity.partitionKey)),
+      sessionId: getSessionIdFromVotePartitionKey(campaignId, getEntityPartitionKey(entity)),
       createdAt: String(entity.createdAt ?? ''),
       isDeletedSuggestion: metadata?.isDeleted ?? false,
     })
