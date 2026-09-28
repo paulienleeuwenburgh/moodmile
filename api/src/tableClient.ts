@@ -157,6 +157,7 @@ export interface SuggestionEntity {
   rowKey: string       // suggestionId
   campaignId: string
   questionId: string
+  sessionId?: string
   name: string
   createdAt: string
   votes: number

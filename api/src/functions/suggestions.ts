@@ -46,9 +46,10 @@ async function postSuggestion(
   request: HttpRequest,
   _context: InvocationContext,
 ): Promise<HttpResponseInit> {
-  const body = (await request.json()) as { campaignId?: string; questionId?: string; name?: string }
+  const body = (await request.json()) as { campaignId?: string; questionId?: string; name?: string; sessionId?: string }
   const campaignId = body.campaignId?.trim()
   const questionId = body.questionId?.trim()
+  const sessionId = body.sessionId?.trim()
   const name = body.name?.trim()
 
   if (!campaignId || !questionId || !name) {
@@ -95,6 +96,7 @@ async function postSuggestion(
     rowKey: id,
     campaignId,
     questionId,
+    sessionId,
     name,
     createdAt,
     votes: 0,
