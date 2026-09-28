@@ -87,6 +87,24 @@ function adminHeaders(adminSecret: string): Record<string, string> {
   return { 'Content-Type': 'application/json', 'X-Admin-Secret': adminSecret }
 }
 
+function getDownloadFileName(contentDisposition: string, fallback: string): string {
+  const fileNameStarMatch = contentDisposition.match(/filename\*\s*=\s*([^;]+)/i)
+  if (fileNameStarMatch) {
+    const rawValue = fileNameStarMatch[1]?.trim()
+    const encodedValue = rawValue?.replace(/^UTF-8''/i, '').replace(/^"|"$/g, '')
+    if (encodedValue) {
+      try {
+        return decodeURIComponent(encodedValue)
+      } catch {
+        return encodedValue
+      }
+    }
+  }
+
+  const fileNameMatch = contentDisposition.match(/filename\s*=\s*("?)([^";]+)\1/i)
+  return fileNameMatch?.[2]?.trim() || fallback
+}
+
 export async function adminDeleteSuggestion(
   adminSecret: string,
   campaignId: string,
@@ -155,8 +173,7 @@ export async function adminDownloadCampaignExport(
     { headers: { 'X-Admin-Secret': adminSecret } },
   )
   const contentDisposition = response.headers.get('Content-Disposition') ?? ''
-  const fileNameMatch = contentDisposition.match(/filename="([^"]+)"/i)
-  const fileName = fileNameMatch?.[1] ?? `${campaignId}-export.json`
+  const fileName = getDownloadFileName(contentDisposition, `${campaignId}-export.json`)
   return {
     blob: await response.blob(),
     fileName,
