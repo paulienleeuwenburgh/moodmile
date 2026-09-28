@@ -12,12 +12,17 @@ export class ApiError extends Error {
   }
 }
 
-async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+async function apiFetchResponse(path: string, init?: RequestInit): Promise<Response> {
   const response = await fetch(`${BASE}${path}`, init)
   if (!response.ok) {
     const body = await response.json().catch(() => ({}))
     throw new ApiError(response.status, (body as { error?: string }).error ?? `HTTP ${response.status}`)
   }
+  return response
+}
+
+async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await apiFetchResponse(path, init)
   return response.json() as Promise<T>
 }
 
@@ -139,4 +144,15 @@ export async function fetchDeletedSuggestions(
     `/mgmt/suggestions?campaignId=${encodeURIComponent(campaignId)}`,
     { headers: { 'X-Admin-Secret': adminSecret } },
   )
+}
+
+export async function adminDownloadCampaignExport(
+  adminSecret: string,
+  campaignId: string,
+): Promise<Blob> {
+  const response = await apiFetchResponse(
+    `/mgmt/campaigns/${encodeURIComponent(campaignId)}/export`,
+    { headers: { 'X-Admin-Secret': adminSecret } },
+  )
+  return response.blob()
 }

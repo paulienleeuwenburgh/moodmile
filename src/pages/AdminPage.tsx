@@ -4,6 +4,7 @@ import { Footer } from '../components/Footer'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { ApiError } from '../api'
 import {
+  adminDownloadCampaignExport,
   fetchCampaign,
   fetchQuestions,
   fetchSuggestions,
@@ -264,6 +265,24 @@ export function AdminPage() {
     })
   }
 
+  async function handleDownloadExport() {
+    try {
+      const blob = await adminDownloadCampaignExport(secret, campaignId)
+      const fileName = `${campaignId}-export.json`
+      const downloadUrl = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = downloadUrl
+      link.download = fileName
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(downloadUrl)
+      showSuccess(`Export downloaded for "${campaign?.title}".`)
+    } catch (err) {
+      showError(getAdminErrorMessage(err, 'Export failed.'))
+    }
+  }
+
   return (
     <main className="app-shell">
       <section className="hero">
@@ -384,6 +403,14 @@ export function AdminPage() {
               These actions affect all data for this campaign. Each requires confirmation before executing.
             </p>
             <div className="admin-action-row">
+              <div className="admin-action">
+                <strong>Export submissions &amp; votes</strong>
+                <p><span className="admin-action__affects">Includes:</span> Campaign metadata, questions, all submissions, and every stored vote row.</p>
+                <p><span className="admin-action__preserves">Download:</span> JSON export for offline analysis or backup.</p>
+                <button type="button" className="admin-btn" onClick={handleDownloadExport}>
+                  Download export
+                </button>
+              </div>
               <div className="admin-action">
                 <strong>Reset votes</strong>
                 <p><span className="admin-action__affects">Affects:</span> All vote records — every candidate's vote count is reset to zero.</p>

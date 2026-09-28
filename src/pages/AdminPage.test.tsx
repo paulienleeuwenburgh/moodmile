@@ -1,6 +1,6 @@
 import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AdminPage } from './AdminPage'
 import type { Campaign, Question, Suggestion } from '../types'
 
@@ -9,6 +9,9 @@ const mockFetchQuestions = vi.fn<(campaignId: string) => Promise<Question[]>>()
 const mockFetchSuggestions = vi.fn<(campaignId: string) => Promise<Suggestion[]>>()
 const mockFetchDeletedSuggestions = vi.fn<
   (adminSecret: string, campaignId: string) => Promise<(Suggestion & { deletedAt?: string; deletedBy?: string; deleteReason?: string })[]>
+>()
+const mockAdminDownloadCampaignExport = vi.fn<
+  (adminSecret: string, campaignId: string) => Promise<Blob>
 >()
 
 vi.mock('../api', () => ({
@@ -24,6 +27,7 @@ vi.mock('../api', () => ({
   fetchQuestions: (...args: Parameters<typeof mockFetchQuestions>) => mockFetchQuestions(...args),
   fetchSuggestions: (...args: Parameters<typeof mockFetchSuggestions>) => mockFetchSuggestions(...args),
   fetchDeletedSuggestions: (...args: Parameters<typeof mockFetchDeletedSuggestions>) => mockFetchDeletedSuggestions(...args),
+  adminDownloadCampaignExport: (...args: Parameters<typeof mockAdminDownloadCampaignExport>) => mockAdminDownloadCampaignExport(...args),
   adminDeleteSuggestion: vi.fn(),
   adminRestoreSuggestion: vi.fn(),
   adminResetVotes: vi.fn(),
@@ -37,9 +41,15 @@ async function createApiError(status: number, message: string) {
 }
 
 describe('AdminPage document title', () => {
+  const createObjectUrl = vi.fn(() => 'blob:download')
+  const revokeObjectUrl = vi.fn()
+  const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+
   beforeEach(() => {
     vi.clearAllMocks()
     document.title = 'MoodMile'
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, writable: true, value: createObjectUrl })
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, writable: true, value: revokeObjectUrl })
 
     mockFetchCampaign.mockResolvedValue({
       id: 'best-padeller-2026',
@@ -63,10 +73,15 @@ describe('AdminPage document title', () => {
     ])
     mockFetchSuggestions.mockResolvedValue([])
     mockFetchDeletedSuggestions.mockResolvedValue([])
+    mockAdminDownloadCampaignExport.mockResolvedValue(new Blob(['{}'], { type: 'application/json' }))
   })
 
   afterEach(() => {
     cleanup()
+  })
+
+  afterAll(() => {
+    clickSpy.mockRestore()
   })
 
   it('uses a generic admin title before a campaign is loaded', () => {
@@ -108,5 +123,21 @@ describe('AdminPage document title', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Unexpected server error. Please try again later.',
     )
+  })
+
+  it('downloads a campaign export from the admin portal', async () => {
+    render(<AdminPage />)
+
+    await userEvent.type(screen.getByLabelText(/admin secret/i), 'secret')
+    await userEvent.click(screen.getByRole('button', { name: /load campaign/i }))
+    await screen.findByText('Admin access granted')
+
+    await userEvent.click(screen.getByRole('button', { name: /download export/i }))
+
+    expect(mockAdminDownloadCampaignExport).toHaveBeenCalledWith('secret', 'ninja-naming')
+    expect(createObjectUrl).toHaveBeenCalledOnce()
+    expect(clickSpy).toHaveBeenCalledOnce()
+    expect(revokeObjectUrl).toHaveBeenCalledWith('blob:download')
+    expect(await screen.findByRole('status')).toHaveTextContent('Export downloaded for "Best Padeller 2026".')
   })
 })

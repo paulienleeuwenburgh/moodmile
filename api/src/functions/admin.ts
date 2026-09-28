@@ -47,19 +47,27 @@
  *   POST /api/mgmt/campaigns/{campaignId}/reset
  *     Full campaign reset: removes all votes AND soft-deletes all suggestions.
  *     Campaign configuration (title, status, voting rules) is untouched.
+ *
+ *   GET /api/mgmt/campaigns/{campaignId}/export
+ *     Downloads a JSON export containing the campaign, its questions, all submissions
+ *     (active and deleted), and all vote rows for the campaign.
  */
 
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions'
 import {
   ensureTableExists,
+  entityToQuestion,
   entityToSuggestion,
+  getQuestionsClient,
   getSuggestionsClient,
   getVotesClient,
+  QuestionEntity,
   SuggestionEntity,
   VoteEntity,
   suggestionPartitionKey,
 } from '../tableClient'
 import { escapeODataString } from '../odata'
+import { getCampaign } from '../campaigns'
 
 // ─── Auth helper ─────────────────────────────────────────────────────────────
 
@@ -142,6 +150,122 @@ async function deleteSuggestion(
   )
 
   return { status: 200, jsonBody: { success: true } }
+}
+
+// ─── GET /api/mgmt/campaigns/{campaignId}/export ──────────────────────────────
+
+function getSessionIdFromVotePartitionKey(campaignId: string, partitionKey: string): string {
+  const prefix = `${campaignId}|`
+  return partitionKey.startsWith(prefix) ? partitionKey.slice(prefix.length) : ''
+}
+
+async function exportCampaignData(
+  request: HttpRequest,
+  _context: InvocationContext,
+): Promise<HttpResponseInit> {
+  const authError = requireAdminSecret(request)
+  if (authError) return authError
+
+  const campaignId = request.params.campaignId
+  if (!campaignId) {
+    return { status: 400, jsonBody: { error: 'campaignId is required.' } }
+  }
+
+  const campaign = await getCampaign(campaignId)
+  if (!campaign) {
+    return { status: 404, jsonBody: { error: 'Campaign not found.' } }
+  }
+
+  const questionsClient = getQuestionsClient()
+  const suggestionsClient = getSuggestionsClient()
+  const votesClient = getVotesClient()
+  await Promise.all([
+    ensureTableExists(questionsClient),
+    ensureTableExists(suggestionsClient),
+    ensureTableExists(votesClient),
+  ])
+
+  const questions: ReturnType<typeof entityToQuestion>[] = []
+  for await (const entity of questionsClient.listEntities<QuestionEntity>({
+    queryOptions: { filter: `PartitionKey eq '${escapeODataString(campaignId)}'` },
+  })) {
+    questions.push(entityToQuestion(entity))
+  }
+  questions.sort((a, b) => a.sortOrder - b.sortOrder)
+  const questionTitles = new Map(questions.map((question) => [question.id, question.title]))
+
+  const suggestionFilter = `PartitionKey ge '${escapeODataString(campaignId)}|' and PartitionKey lt '${escapeODataString(campaignId)}~'`
+  const submissions = []
+  const suggestionMetadata = new Map<string, { questionId: string; name: string; isDeleted: boolean }>()
+  for await (const entity of suggestionsClient.listEntities<SuggestionEntity>({
+    queryOptions: { filter: suggestionFilter },
+  })) {
+    const suggestion = entityToSuggestion(entity)
+    const isDeleted = entity.isDeleted === true
+    submissions.push({
+      ...suggestion,
+      questionTitle: questionTitles.get(suggestion.questionId) ?? suggestion.questionId,
+      isDeleted,
+      deletedAt: entity.deletedAt,
+      deletedBy: entity.deletedBy,
+      deleteReason: entity.deleteReason,
+    })
+    suggestionMetadata.set(suggestion.id, {
+      questionId: suggestion.questionId,
+      name: suggestion.name,
+      isDeleted,
+    })
+  }
+  submissions.sort((a, b) => a.questionId.localeCompare(b.questionId) || a.name.localeCompare(b.name))
+
+  const voteFilter = `PartitionKey ge '${escapeODataString(campaignId)}|' and PartitionKey lt '${escapeODataString(campaignId)}~'`
+  const votes = []
+  for await (const entity of votesClient.listEntities<VoteEntity>({
+    queryOptions: { filter: voteFilter },
+  })) {
+    const suggestionId = String(entity.suggestionId ?? String(entity.rowKey).split('|')[0] ?? '')
+    const metadata = suggestionMetadata.get(suggestionId)
+    const questionId = String(entity.questionId ?? metadata?.questionId ?? '')
+    votes.push({
+      campaignId,
+      questionId,
+      questionTitle: questionTitles.get(questionId) ?? questionId,
+      suggestionId,
+      suggestionName: metadata?.name ?? '',
+      sessionId: getSessionIdFromVotePartitionKey(campaignId, String(entity.partitionKey)),
+      createdAt: String(entity.createdAt ?? ''),
+      isDeletedSuggestion: metadata?.isDeleted ?? false,
+    })
+  }
+  votes.sort(
+    (a, b) =>
+      a.createdAt.localeCompare(b.createdAt) ||
+      a.sessionId.localeCompare(b.sessionId) ||
+      a.suggestionId.localeCompare(b.suggestionId),
+  )
+
+  const exportedAt = new Date().toISOString()
+  const fileTimestamp = exportedAt.replace(/[:.]/g, '-')
+  const filename = `${campaignId}-export-${fileTimestamp}.json`
+
+  return {
+    status: 200,
+    body: JSON.stringify(
+      {
+        exportedAt,
+        campaign,
+        questions,
+        submissions,
+        votes,
+      },
+      null,
+      2,
+    ),
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+    },
+  }
 }
 
 // ─── POST /api/mgmt/suggestions/restore ─────────────────────────────────────
@@ -435,4 +559,11 @@ app.http('adminFullCampaignReset', {
   authLevel: 'anonymous',
   route: 'mgmt/campaigns/{campaignId}/reset',
   handler: fullCampaignReset,
+})
+
+app.http('adminExportCampaignData', {
+  methods: ['GET'],
+  authLevel: 'anonymous',
+  route: 'mgmt/campaigns/{campaignId}/export',
+  handler: exportCampaignData,
 })
