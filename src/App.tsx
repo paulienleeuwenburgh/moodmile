@@ -133,7 +133,7 @@ function App({ campaignId }: AppProps) {
     setSuggestions((current) => [...current, optimistic])
 
     // Persist to backend and swap the temp entry for the server-assigned one
-    postSuggestion(campaign.id, selectedQuestionId, name.trim())
+    postSuggestion(campaign.id, selectedQuestionId, name.trim(), getSessionId())
       .then((created) => {
         if (created) {
           setSuggestions((current) =>

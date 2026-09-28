@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { Campaign, Question, Suggestion } from '../types'
+import type { AdminCampaignSummary, Campaign, ExportFormat, Question, Suggestion } from '../types'
 import { Footer } from '../components/Footer'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { ApiError } from '../api'
@@ -9,6 +9,7 @@ import {
   fetchQuestions,
   fetchSuggestions,
   fetchDeletedSuggestions,
+  fetchAdminCampaignSummary,
   adminDeleteSuggestion,
   adminRestoreSuggestion,
   adminResetVotes,
@@ -71,6 +72,7 @@ export function AdminPage() {
   const [questions, setQuestions] = useState<Question[]>([])
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const [deletedSuggestions, setDeletedSuggestions] = useState<DeletedSuggestion[]>([])
+  const [summary, setSummary] = useState<AdminCampaignSummary>({ uniqueSubmissionDevices: 0, uniqueVotingDevices: 0 })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
@@ -78,6 +80,7 @@ export function AdminPage() {
   const [confirmInputValue, setConfirmInputValue] = useState('')
   const [deleteReason, setDeleteReason] = useState('')
   const [deletedBy, setDeletedBy] = useState('')
+  const [exportFormat, setExportFormat] = useState<ExportFormat>('json')
 
   const questionById = Object.fromEntries(questions.map((q) => [q.id, q]))
   const totalVotes = [...suggestions, ...deletedSuggestions].reduce((sum, s) => sum + s.votes, 0)
@@ -101,6 +104,7 @@ export function AdminPage() {
     setQuestions([])
     setSuggestions([])
     setDeletedSuggestions([])
+    setSummary({ uniqueSubmissionDevices: 0, uniqueVotingDevices: 0 })
     setIsAuthenticated(false)
     setError('')
     setSuccessMessage('')
@@ -121,16 +125,18 @@ export function AdminPage() {
     setError('')
     try {
       const id = campaignId.trim()
-      const [c, q, s, d] = await Promise.all([
+      const [c, q, s, d, summary] = await Promise.all([
         fetchCampaign(id),
         fetchQuestions(id),
         fetchSuggestions(id),
         fetchDeletedSuggestions(secret.trim(), id),
+        fetchAdminCampaignSummary(secret.trim(), id),
       ])
       setCampaign(c)
       setQuestions(q)
       setSuggestions(s)
       setDeletedSuggestions(d)
+      setSummary(summary)
       setIsAuthenticated(true)
       setError('')
     } catch (err) {
@@ -145,12 +151,14 @@ export function AdminPage() {
   async function refresh() {
     if (!campaign) return
     try {
-      const [s, d] = await Promise.all([
+      const [s, d, latestSummary] = await Promise.all([
         fetchSuggestions(campaignId),
         fetchDeletedSuggestions(secret, campaignId),
+        fetchAdminCampaignSummary(secret, campaignId),
       ])
       setSuggestions(s)
       setDeletedSuggestions(d)
+      setSummary(latestSummary)
     } catch (err) {
       console.error('Failed to refresh campaign data:', err)
     }
@@ -267,7 +275,7 @@ export function AdminPage() {
 
   async function handleDownloadExport() {
     try {
-      const { blob, fileName } = await adminDownloadCampaignExport(secret, campaignId)
+      const { blob, fileName } = await adminDownloadCampaignExport(secret, campaignId, exportFormat)
       const downloadUrl = URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = downloadUrl
@@ -276,7 +284,7 @@ export function AdminPage() {
       link.click()
       link.remove()
       setTimeout(() => URL.revokeObjectURL(downloadUrl), 0)
-      showSuccess(`Export download started for "${campaign?.title}".`)
+      showSuccess(`Export download started for "${campaign?.title}" as ${exportFormat.toUpperCase()}.`)
     } catch (err) {
       showError(getAdminErrorMessage(err, 'Export failed.'))
     }
@@ -386,6 +394,14 @@ export function AdminPage() {
                 <span className="admin-summary-card__value">{totalVotes}</span>
                 <span className="admin-summary-card__label">Total votes cast</span>
               </div>
+              <div className="admin-summary-card">
+                <span className="admin-summary-card__value">{summary.uniqueSubmissionDevices}</span>
+                <span className="admin-summary-card__label">Unique submission devices</span>
+              </div>
+              <div className="admin-summary-card">
+                <span className="admin-summary-card__value">{summary.uniqueVotingDevices}</span>
+                <span className="admin-summary-card__label">Unique voting devices</span>
+              </div>
               {campaign.updatedAt && (
                 <div className="admin-summary-card">
                   <span className="admin-summary-card__value">{new Date(campaign.updatedAt).toLocaleDateString()}</span>
@@ -405,7 +421,30 @@ export function AdminPage() {
               <div className="admin-action">
                 <strong>Export submissions &amp; votes</strong>
                 <p><span className="admin-action__affects">Includes:</span> Campaign metadata, questions, all submissions, and every stored vote row.</p>
-                <p><span className="admin-action__preserves">Download:</span> JSON export for offline analysis or backup.</p>
+                <p><span className="admin-action__preserves">Download:</span> JSON with metadata or CSV with submissions only.</p>
+                <fieldset className="admin-export-format">
+                  <legend>Export format</legend>
+                  <label>
+                    <input
+                      type="radio"
+                      name="export-format"
+                      value="json"
+                      checked={exportFormat === 'json'}
+                      onChange={() => setExportFormat('json')}
+                    />
+                    JSON
+                  </label>
+                  <label>
+                    <input
+                      type="radio"
+                      name="export-format"
+                      value="csv"
+                      checked={exportFormat === 'csv'}
+                      onChange={() => setExportFormat('csv')}
+                    />
+                    CSV
+                  </label>
+                </fieldset>
                 <button type="button" className="admin-btn" onClick={handleDownloadExport}>
                   Download export
                 </button>

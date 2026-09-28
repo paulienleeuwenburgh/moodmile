@@ -1,4 +1,4 @@
-import type { Campaign, Question, Suggestion } from './types'
+import type { AdminCampaignSummary, Campaign, ExportFormat, Question, Suggestion } from './types'
 
 const BASE = '/api'
 
@@ -42,12 +42,13 @@ export async function postSuggestion(
   campaignId: string,
   questionId: string,
   name: string,
+  sessionId: string,
 ): Promise<Suggestion | null> {
   try {
     return await apiFetch<Suggestion>('/suggestions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ campaignId, questionId, name }),
+      body: JSON.stringify({ campaignId, questionId, name, sessionId }),
     })
   } catch (err) {
     if (err instanceof ApiError && err.status === 409) {
@@ -174,12 +175,23 @@ export async function fetchDeletedSuggestions(
   )
 }
 
+export async function fetchAdminCampaignSummary(
+  adminSecret: string,
+  campaignId: string,
+): Promise<AdminCampaignSummary> {
+  return apiFetch<AdminCampaignSummary>(
+    `/mgmt/campaigns/${encodeURIComponent(campaignId)}/summary`,
+    { headers: { 'X-Admin-Secret': adminSecret } },
+  )
+}
+
 export async function adminDownloadCampaignExport(
   adminSecret: string,
   campaignId: string,
+  format: ExportFormat,
 ): Promise<{ blob: Blob; fileName: string }> {
   const response = await apiFetchResponse(
-    `/mgmt/campaigns/${encodeURIComponent(campaignId)}/export`,
+    `/mgmt/campaigns/${encodeURIComponent(campaignId)}/export?format=${encodeURIComponent(format)}`,
     { headers: { 'X-Admin-Secret': adminSecret } },
   )
   const contentDisposition = response.headers.get('Content-Disposition') ?? ''

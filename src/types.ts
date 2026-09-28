@@ -53,3 +53,10 @@ export interface Vote {
   sessionId: string
   createdAt: string
 }
+
+export type ExportFormat = 'json' | 'csv'
+
+export interface AdminCampaignSummary {
+  uniqueSubmissionDevices: number
+  uniqueVotingDevices: number
+}
