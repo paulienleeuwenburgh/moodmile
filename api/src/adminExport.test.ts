@@ -72,7 +72,7 @@ vi.mock('./campaigns', () => ({
   getCampaign: mockGetCampaign,
 }))
 
-import { exportCampaignData } from './functions/admin'
+import { exportCampaignData, getCampaignSummary } from './functions/admin'
 
 describe('admin campaign export', () => {
   beforeEach(() => {
@@ -123,6 +123,7 @@ describe('admin campaign export', () => {
           rowKey: 's-2',
           campaignId: 'best-padeller-2026',
           questionId: 'q-2',
+          sessionId: 'session-b',
           name: 'Casey',
           createdAt: '2026-02-02T00:00:00.000Z',
           votes: 1,
@@ -136,6 +137,7 @@ describe('admin campaign export', () => {
           rowKey: 's-1',
           campaignId: 'best-padeller-2026',
           questionId: 'q-1',
+          sessionId: 'session-a',
           name: 'Alex',
           createdAt: '2026-02-01T00:00:00.000Z',
           votes: 2,
@@ -168,6 +170,7 @@ describe('admin campaign export', () => {
       {
         params: { campaignId: 'best-padeller-2026' },
         headers: { get: (name: string) => (name.toLowerCase() === 'x-admin-secret' ? 'secret' : null) },
+        query: { get: () => 'json' },
       },
       {},
     )
@@ -178,8 +181,9 @@ describe('admin campaign export', () => {
 
     const payload = JSON.parse(String(response.body)) as {
       campaign: { id: string; title: string }
+      summary: { uniqueSubmissionDevices: number; uniqueVotingDevices: number }
       questions: Array<{ id: string }>
-      submissions: Array<{ id: string; questionTitle: string; isDeleted: boolean; deletedBy?: string }>
+      submissions: Array<{ id: string; questionTitle: string; isDeleted: boolean; deletedBy?: string; sessionId: string }>
       votes: Array<{ sessionId: string; suggestionName: string; isDeletedSuggestion: boolean }>
     }
 
@@ -188,17 +192,23 @@ describe('admin campaign export', () => {
       title: 'Best Padeller 2026',
     })
     expect(payload.questions.map((question) => question.id)).toEqual(['q-1', 'q-2'])
+    expect(payload.summary).toEqual({
+      uniqueSubmissionDevices: 2,
+      uniqueVotingDevices: 2,
+    })
     expect(payload.submissions).toEqual([
       expect.objectContaining({
         id: 's-1',
         questionTitle: 'First category',
         isDeleted: false,
+        sessionId: 'session-a',
       }),
       expect.objectContaining({
         id: 's-2',
         questionTitle: 'Second category',
         isDeleted: true,
         deletedBy: 'Admin',
+        sessionId: 'session-b',
       }),
     ])
     expect(payload.votes).toEqual([
@@ -213,5 +223,39 @@ describe('admin campaign export', () => {
         isDeletedSuggestion: true,
       }),
     ])
+  })
+
+  it('exports submissions as csv when requested', async () => {
+    const response = await exportCampaignData(
+      {
+        params: { campaignId: 'best-padeller-2026' },
+        headers: { get: (name: string) => (name.toLowerCase() === 'x-admin-secret' ? 'secret' : null) },
+        query: { get: (name: string) => (name === 'format' ? 'csv' : null) },
+      },
+      {},
+    )
+
+    expect(response.status).toBe(200)
+    expect(response.headers['Content-Type']).toBe('text/csv; charset=utf-8')
+    expect(response.headers['Content-Disposition']).toContain('.csv')
+    expect(String(response.body)).toContain('campaignId,questionId,questionTitle,submissionId,submissionName,createdAt,votes,submissionDeviceId,isDeleted,deletedAt,deletedBy,deleteReason,imageUrl')
+    expect(String(response.body)).toContain('best-padeller-2026,q-1,First category,s-1,Alex,2026-02-01T00:00:00.000Z,2,session-a,false,,,,')
+    expect(String(response.body)).toContain('best-padeller-2026,q-2,Second category,s-2,Casey,2026-02-02T00:00:00.000Z,1,session-b,true,2026-03-01T12:00:00.000Z,Admin,Duplicate,')
+  })
+
+  it('returns unique device counts for the admin summary endpoint', async () => {
+    const response = await getCampaignSummary(
+      {
+        params: { campaignId: 'best-padeller-2026' },
+        headers: { get: (name: string) => (name.toLowerCase() === 'x-admin-secret' ? 'secret' : null) },
+      },
+      {},
+    )
+
+    expect(response.status).toBe(200)
+    expect(response.jsonBody).toEqual({
+      uniqueSubmissionDevices: 2,
+      uniqueVotingDevices: 2,
+    })
   })
 })

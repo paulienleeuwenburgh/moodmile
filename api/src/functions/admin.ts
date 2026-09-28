@@ -49,8 +49,14 @@
  *     Campaign configuration (title, status, voting rules) is untouched.
  *
  *   GET /api/mgmt/campaigns/{campaignId}/export
- *     Downloads a JSON export containing the campaign, its questions, all submissions
- *     (active and deleted), and all vote rows for the campaign.
+ *     Downloads either:
+ *       - a JSON export containing campaign metadata, questions, all submissions
+ *         (active and deleted), summary metrics, and all vote rows; or
+ *       - a CSV export containing all submissions only.
+ *
+ *   GET /api/mgmt/campaigns/{campaignId}/summary
+ *     Returns admin-only campaign summary metrics including unique submission
+ *     devices and unique voting devices.
  */
 
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions'
@@ -68,6 +74,40 @@ import {
 } from '../tableClient'
 import { escapeODataString } from '../odata'
 import { getCampaign } from '../campaigns'
+
+type ExportFormat = 'json' | 'csv'
+
+interface AdminSubmissionExport {
+  id: string
+  campaignId: string
+  questionId: string
+  questionTitle: string
+  name: string
+  createdAt: string
+  votes: number
+  imageUrl?: string
+  sessionId: string
+  isDeleted: boolean
+  deletedAt?: string
+  deletedBy?: string
+  deleteReason?: string
+}
+
+interface AdminVoteExport {
+  campaignId: string
+  questionId: string
+  questionTitle: string
+  suggestionId: string
+  suggestionName: string
+  sessionId: string
+  createdAt: string
+  isDeletedSuggestion: boolean
+}
+
+interface AdminCampaignSummary {
+  uniqueSubmissionDevices: number
+  uniqueVotingDevices: number
+}
 
 // ─── Auth helper ─────────────────────────────────────────────────────────────
 
@@ -180,21 +220,62 @@ function getSuggestionIdForExport(
   return suggestionMetadata.has(prefixCandidate) ? prefixCandidate : rowKey
 }
 
-export async function exportCampaignData(
-  request: HttpRequest,
-  _context: InvocationContext,
-): Promise<HttpResponseInit> {
-  const authError = requireAdminSecret(request)
-  if (authError) return authError
+function parseExportFormat(value: string | null): ExportFormat | null {
+  if (!value || value === 'json') return 'json'
+  if (value === 'csv') return 'csv'
+  return null
+}
 
-  const campaignId = request.params.campaignId
-  if (!campaignId) {
-    return { status: 400, jsonBody: { error: 'campaignId is required.' } }
+function countUniqueValues(values: Iterable<string>): number {
+  return new Set([...values].filter((value) => value.length > 0)).size
+}
+
+function escapeCsvValue(value: unknown): string {
+  const stringValue = String(value ?? '')
+  if (/[",\n\r]/.test(stringValue)) {
+    return `"${stringValue.replace(/"/g, '""')}"`
   }
+  return stringValue
+}
 
+function buildSubmissionsCsv(submissions: AdminSubmissionExport[]): string {
+  const headers = [
+    'campaignId',
+    'questionId',
+    'questionTitle',
+    'submissionId',
+    'submissionName',
+    'createdAt',
+    'votes',
+    'submissionDeviceId',
+    'isDeleted',
+    'deletedAt',
+    'deletedBy',
+    'deleteReason',
+    'imageUrl',
+  ]
+  const rows = submissions.map((submission) => [
+    submission.campaignId,
+    submission.questionId,
+    submission.questionTitle,
+    submission.id,
+    submission.name,
+    submission.createdAt,
+    submission.votes,
+    submission.sessionId,
+    submission.isDeleted,
+    submission.deletedAt ?? '',
+    submission.deletedBy ?? '',
+    submission.deleteReason ?? '',
+    submission.imageUrl ?? '',
+  ])
+  return [headers, ...rows].map((row) => row.map((value) => escapeCsvValue(value)).join(',')).join('\n')
+}
+
+async function collectCampaignAdminData(campaignId: string) {
   const campaign = await getCampaign(campaignId)
   if (!campaign) {
-    return { status: 404, jsonBody: { error: 'Campaign not found.' } }
+    return null
   }
 
   const questionsClient = getQuestionsClient()
@@ -216,7 +297,7 @@ export async function exportCampaignData(
   const questionTitles = new Map(questions.map((question) => [question.id, question.title]))
 
   const suggestionFilter = `PartitionKey ge '${escapeODataString(campaignId)}|' and PartitionKey lt '${escapeODataString(campaignId)}~'`
-  const submissions = []
+  const submissions: AdminSubmissionExport[] = []
   const suggestionMetadata = new Map<string, { questionId: string; name: string; isDeleted: boolean }>()
   for await (const entity of suggestionsClient.listEntities<SuggestionEntity>({
     queryOptions: { filter: suggestionFilter },
@@ -226,6 +307,7 @@ export async function exportCampaignData(
     submissions.push({
       ...suggestion,
       questionTitle: questionTitles.get(suggestion.questionId) ?? suggestion.questionId,
+      sessionId: String(entity.sessionId ?? ''),
       isDeleted,
       deletedAt: entity.deletedAt,
       deletedBy: entity.deletedBy,
@@ -240,7 +322,7 @@ export async function exportCampaignData(
   submissions.sort((a, b) => a.questionId.localeCompare(b.questionId) || a.name.localeCompare(b.name))
 
   const voteFilter = `PartitionKey ge '${escapeODataString(campaignId)}|' and PartitionKey lt '${escapeODataString(campaignId)}~'`
-  const votes = []
+  const votes: AdminVoteExport[] = []
   for await (const entity of votesClient.listEntities<VoteEntity>({
     queryOptions: { filter: voteFilter },
   })) {
@@ -265,19 +347,85 @@ export async function exportCampaignData(
       a.suggestionId.localeCompare(b.suggestionId),
   )
 
+  const summary: AdminCampaignSummary = {
+    uniqueSubmissionDevices: countUniqueValues(submissions.map((submission) => submission.sessionId)),
+    uniqueVotingDevices: countUniqueValues(votes.map((vote) => vote.sessionId)),
+  }
+
+  return { campaign, questions, submissions, votes, summary }
+}
+
+export async function getCampaignSummary(
+  request: HttpRequest,
+  _context: InvocationContext,
+): Promise<HttpResponseInit> {
+  const authError = requireAdminSecret(request)
+  if (authError) return authError
+
+  const campaignId = request.params.campaignId
+  if (!campaignId) {
+    return { status: 400, jsonBody: { error: 'campaignId is required.' } }
+  }
+
+  const data = await collectCampaignAdminData(campaignId)
+  if (!data) {
+    return { status: 404, jsonBody: { error: 'Campaign not found.' } }
+  }
+
+  return {
+    status: 200,
+    jsonBody: data.summary,
+    headers: { 'Content-Type': 'application/json' },
+  }
+}
+
+export async function exportCampaignData(
+  request: HttpRequest,
+  _context: InvocationContext,
+): Promise<HttpResponseInit> {
+  const authError = requireAdminSecret(request)
+  if (authError) return authError
+
+  const campaignId = request.params.campaignId
+  if (!campaignId) {
+    return { status: 400, jsonBody: { error: 'campaignId is required.' } }
+  }
+
+  const format = parseExportFormat(request.query.get('format'))
+  if (!format) {
+    return { status: 400, jsonBody: { error: 'format must be either "json" or "csv".' } }
+  }
+
+  const data = await collectCampaignAdminData(campaignId)
+  if (!data) {
+    return { status: 404, jsonBody: { error: 'Campaign not found.' } }
+  }
+
   const exportedAt = new Date().toISOString()
   const fileTimestamp = exportedAt.replace(/[:.]/g, '-')
-  const filename = `${campaignId}-export-${fileTimestamp}.json`
+  const filename = `${campaignId}-export-${fileTimestamp}.${format}`
+
+  if (format === 'csv') {
+    return {
+      status: 200,
+      body: buildSubmissionsCsv(data.submissions),
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
+      },
+    }
+  }
 
   return {
     status: 200,
     body: JSON.stringify(
       {
         exportedAt,
-        campaign,
-        questions,
-        submissions,
-        votes,
+        campaign: data.campaign,
+        summary: data.summary,
+        questions: data.questions,
+        submissions: data.submissions,
+        votes: data.votes,
       },
       null,
       2,
@@ -587,4 +735,11 @@ app.http('adminExportCampaignData', {
   authLevel: 'anonymous',
   route: 'mgmt/campaigns/{campaignId}/export',
   handler: exportCampaignData,
+})
+
+app.http('adminGetCampaignSummary', {
+  methods: ['GET'],
+  authLevel: 'anonymous',
+  route: 'mgmt/campaigns/{campaignId}/summary',
+  handler: getCampaignSummary,
 })

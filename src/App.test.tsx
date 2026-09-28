@@ -17,7 +17,9 @@ const mockFetchCampaign = vi.fn<(campaignId: string) => Promise<Campaign>>()
 const mockFetchQuestions = vi.fn<(campaignId: string) => Promise<Question[]>>()
 const mockFetchSuggestions = vi.fn<(campaignId: string) => Promise<Suggestion[]>>()
 const mockFetchVoteCounts = vi.fn<(campaignId: string, sessionId: string) => Promise<Map<string, number>>>()
-const mockPostSuggestion = vi.fn<(campaignId: string, questionId: string, name: string) => Promise<Suggestion | null>>()
+const mockPostSuggestion = vi.fn<
+  (campaignId: string, questionId: string, name: string, sessionId: string) => Promise<Suggestion | null>
+>()
 const mockPostVote = vi.fn<
   (campaignId: string, questionId: string, suggestionId: string, sessionId: string, revoke: boolean) => Promise<Suggestion | null>
 >()

@@ -2,7 +2,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AdminPage } from './AdminPage'
-import type { Campaign, Question, Suggestion } from '../types'
+import type { AdminCampaignSummary, Campaign, ExportFormat, Question, Suggestion } from '../types'
 
 const mockFetchCampaign = vi.fn<(campaignId: string) => Promise<Campaign>>()
 const mockFetchQuestions = vi.fn<(campaignId: string) => Promise<Question[]>>()
@@ -10,8 +10,9 @@ const mockFetchSuggestions = vi.fn<(campaignId: string) => Promise<Suggestion[]>
 const mockFetchDeletedSuggestions = vi.fn<
   (adminSecret: string, campaignId: string) => Promise<(Suggestion & { deletedAt?: string; deletedBy?: string; deleteReason?: string })[]>
 >()
+const mockFetchAdminCampaignSummary = vi.fn<(adminSecret: string, campaignId: string) => Promise<AdminCampaignSummary>>()
 const mockAdminDownloadCampaignExport = vi.fn<
-  (adminSecret: string, campaignId: string) => Promise<{ blob: Blob; fileName: string }>
+  (adminSecret: string, campaignId: string, format: ExportFormat) => Promise<{ blob: Blob; fileName: string }>
 >()
 
 vi.mock('../api', () => ({
@@ -27,6 +28,7 @@ vi.mock('../api', () => ({
   fetchQuestions: (...args: Parameters<typeof mockFetchQuestions>) => mockFetchQuestions(...args),
   fetchSuggestions: (...args: Parameters<typeof mockFetchSuggestions>) => mockFetchSuggestions(...args),
   fetchDeletedSuggestions: (...args: Parameters<typeof mockFetchDeletedSuggestions>) => mockFetchDeletedSuggestions(...args),
+  fetchAdminCampaignSummary: (...args: Parameters<typeof mockFetchAdminCampaignSummary>) => mockFetchAdminCampaignSummary(...args),
   adminDownloadCampaignExport: (...args: Parameters<typeof mockAdminDownloadCampaignExport>) => mockAdminDownloadCampaignExport(...args),
   adminDeleteSuggestion: vi.fn(),
   adminRestoreSuggestion: vi.fn(),
@@ -73,6 +75,10 @@ describe('AdminPage document title', () => {
     ])
     mockFetchSuggestions.mockResolvedValue([])
     mockFetchDeletedSuggestions.mockResolvedValue([])
+    mockFetchAdminCampaignSummary.mockResolvedValue({
+      uniqueSubmissionDevices: 2,
+      uniqueVotingDevices: 3,
+    })
     mockAdminDownloadCampaignExport.mockResolvedValue({
       blob: new Blob(['{}'], { type: 'application/json' }),
       fileName: 'ninja-naming-export-2026-09-28.json',
@@ -100,6 +106,10 @@ describe('AdminPage document title', () => {
 
     await screen.findByText('Admin access granted')
     expect(document.title).toBe('MoodMile Admin | Best Padeller 2026')
+    expect(screen.getByText('Unique submission devices')).toBeInTheDocument()
+    expect(screen.getByText('Unique voting devices')).toBeInTheDocument()
+    expect(screen.getByText('2')).toBeInTheDocument()
+    expect(screen.getByText('3')).toBeInTheDocument()
   })
 
   it('shows the invalid secret message for a 401 API error', async () => {
@@ -138,10 +148,28 @@ describe('AdminPage document title', () => {
 
     await user.click(screen.getByRole('button', { name: /download export/i }))
 
-    expect(mockAdminDownloadCampaignExport).toHaveBeenCalledWith('secret', 'ninja-naming')
+    expect(mockAdminDownloadCampaignExport).toHaveBeenCalledWith('secret', 'ninja-naming', 'json')
     expect(createObjectUrl).toHaveBeenCalledOnce()
     expect(clickSpy).toHaveBeenCalledOnce()
     await waitFor(() => expect(revokeObjectUrl).toHaveBeenCalledWith('blob:download'))
-    expect(await screen.findByRole('status')).toHaveTextContent('Export download started for "Best Padeller 2026".')
+    expect(await screen.findByRole('status')).toHaveTextContent('Export download started for "Best Padeller 2026" as JSON.')
+  })
+
+  it('downloads a csv campaign export from the admin portal', async () => {
+    const user = userEvent.setup()
+    mockAdminDownloadCampaignExport.mockResolvedValueOnce({
+      blob: new Blob(['id,name'], { type: 'text/csv' }),
+      fileName: 'ninja-naming-export-2026-09-28.csv',
+    })
+    render(<AdminPage />)
+
+    await user.type(screen.getByLabelText(/admin secret/i), 'secret')
+    await user.click(screen.getByRole('button', { name: /load campaign/i }))
+    await screen.findByText('Admin access granted')
+
+    await user.click(screen.getByRole('radio', { name: 'CSV' }))
+    await user.click(screen.getByRole('button', { name: /download export/i }))
+
+    expect(mockAdminDownloadCampaignExport).toHaveBeenCalledWith('secret', 'ninja-naming', 'csv')
   })
 })
