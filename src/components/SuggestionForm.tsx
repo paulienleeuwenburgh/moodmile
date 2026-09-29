@@ -8,29 +8,26 @@ import {
 } from '../utils/validateSuggestion'
 
 interface SuggestionFormProps {
-  questions: Question[]
-  selectedQuestionId: string
-  onQuestionChange: (questionId: string) => void
+  question: Question
   onSubmitSuggestion: (suggestionText: string) => void | Promise<void>
 }
 
 export function SuggestionForm({
-  questions,
-  selectedQuestionId,
-  onQuestionChange,
+  question,
   onSubmitSuggestion,
 }: SuggestionFormProps) {
   const [suggestion, setSuggestion] = useState('')
   const [validationError, setValidationError] = useState('')
-  const selectedQuestion = questions.find((question) => question.id === selectedQuestionId)
-  const maxSize = selectedQuestion?.maxSize ?? SUGGESTION_MAX_LENGTH
+  const maxSize = question.maxSize ?? SUGGESTION_MAX_LENGTH
   const remainingCharacters = maxSize - countSuggestionCharacters(suggestion)
+  const countId = `name-suggestion-count-${question.id}`
+  const errorId = `name-suggestion-error-${question.id}`
   const characterCountMessage = remainingCharacters < 0
     ? `${Math.abs(remainingCharacters)} character${Math.abs(remainingCharacters) === 1 ? '' : 's'} over limit`
     : `${remainingCharacters} character${remainingCharacters === 1 ? '' : 's'} left`
   const describedBy = validationError
-    ? 'name-suggestion-count name-suggestion-error'
-    : 'name-suggestion-count'
+    ? `${countId} ${errorId}`
+    : countId
 
   const handleChange = (value: string) => {
     setSuggestion(value)
@@ -40,7 +37,7 @@ export function SuggestionForm({
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const trimmedSuggestion = suggestion.trim()
-    if (!trimmedSuggestion && !selectedQuestion?.required) {
+    if (!trimmedSuggestion && !question.required) {
       return
     }
 
@@ -61,30 +58,12 @@ export function SuggestionForm({
   }
 
   return (
-    <form className="suggestion-form" onSubmit={handleSubmit}>
-      <h2>Share your thoughts</h2>
+    <form className="suggestion-form" onSubmit={handleSubmit} aria-label={`Answer ${question.title}`}>
+      <h2>Your answer</h2>
       <div className="suggestion-form__row">
-        <label htmlFor="question-select">Question</label>
-        <select
-          id="question-select"
-          value={selectedQuestionId}
-          onChange={(event) => {
-            setSuggestion('')
-            setValidationError('')
-            onQuestionChange(event.target.value)
-          }}
-        >
-          {questions.map((question) => (
-            <option key={question.id} value={question.id}>
-              {question.title}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="suggestion-form__row">
-        <label htmlFor="name-suggestion">Your answer</label>
+        <label htmlFor={`name-suggestion-${question.id}`}>Your answer{question.required ? ' (required)' : ''}</label>
         <input
-          id="name-suggestion"
+          id={`name-suggestion-${question.id}`}
           value={suggestion}
           onChange={(event) => handleChange(event.target.value)}
           placeholder="e.g. Sunny Stride"
@@ -93,13 +72,13 @@ export function SuggestionForm({
           aria-invalid={!!validationError}
         />
         <span
-          id="name-suggestion-count"
+          id={countId}
           className={`suggestion-form__count${remainingCharacters < 0 ? ' suggestion-form__count--invalid' : ''}`}
         >
           {characterCountMessage}
         </span>
         {validationError && (
-          <span id="name-suggestion-error" className="suggestion-form__error" role="alert">
+          <span id={errorId} className="suggestion-form__error" role="alert">
             {validationError}
           </span>
         )}

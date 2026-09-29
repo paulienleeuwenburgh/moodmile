@@ -32,7 +32,6 @@ function App({ campaignId }: AppProps) {
   const [campaign, setCampaign] = useState<Campaign | null>(null)
   const [campaignNotFound, setCampaignNotFound] = useState(false)
   const [questions, setQuestions] = useState<Question[]>([])
-  const [selectedQuestionId, setSelectedQuestionId] = useState('')
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const [questionResponses, setQuestionResponses] = useState<QuestionResponse[]>([])
   const [voteCountById, setVoteCountById] = useState<Map<string, number>>(new Map())
@@ -71,11 +70,6 @@ function App({ campaignId }: AppProps) {
 
       setCampaign(loadedCampaign)
       setQuestions(loadedQuestions)
-      setSelectedQuestionId((current) =>
-        current && loadedQuestions.some((question) => question.id === current)
-          ? current
-          : (loadedQuestions[0]?.id ?? ''),
-      )
       setSuggestions(loadedSuggestions)
       setQuestionResponses(loadedResponses)
       setVoteCountById(loadedVoteCounts)
@@ -106,8 +100,8 @@ function App({ campaignId }: AppProps) {
     void refreshData()
   }, [refreshData])
 
-  const handleSuggestionSubmit = (name: string) => {
-    if (!selectedQuestionId || !campaign) {
+  const handleSuggestionSubmit = (questionId: string, name: string) => {
+    if (!campaign) {
       return
     }
 
@@ -116,7 +110,7 @@ function App({ campaignId }: AppProps) {
     // Client-side duplicate guard (UX): normalise and skip if already present
     const isDuplicate = suggestions.some(
       (s) =>
-        s.questionId === selectedQuestionId &&
+        s.questionId === questionId &&
         s.name.trim().toLowerCase() === name.trim().toLowerCase(),
     )
     if (isDuplicate) {
@@ -129,7 +123,7 @@ function App({ campaignId }: AppProps) {
     const optimistic: Suggestion = {
       id: tempId,
       campaignId: campaign.id,
-      questionId: selectedQuestionId,
+      questionId,
       name: name.trim(),
       createdAt: new Date().toISOString(),
       votes: 0,
@@ -137,7 +131,7 @@ function App({ campaignId }: AppProps) {
     setSuggestions((current) => [...current, optimistic])
 
     // Persist to backend and swap the temp entry for the server-assigned one
-    postSuggestion(campaign.id, selectedQuestionId, name.trim(), getSessionId())
+    postSuggestion(campaign.id, questionId, name.trim(), getSessionId())
       .then((created) => {
         if (created) {
           setSuggestions((current) =>
@@ -288,13 +282,9 @@ function App({ campaignId }: AppProps) {
 
   const bannerImageUrl = campaign.bannerImageUrl?.trim()
   const showBanner = Boolean(bannerImageUrl && failedBannerUrl !== bannerImageUrl)
-  const selectedQuestion = questions.find((question) => question.id === selectedQuestionId)
   const suggestionQuestions = questions.filter((question) => question.questionType === 'text')
   const votableQuestions = suggestionQuestions.filter((question) => (question.numberOfVotes ?? 0) > 0)
   const visibleSuggestions = suggestions.filter((suggestion) => votableQuestions.some((question) => question.id === suggestion.questionId))
-  const answerResults = selectedQuestion
-    ? questionResponses.filter((response) => response.questionId === selectedQuestion.id)
-    : []
 
   return (
     <main className="app-shell">
@@ -368,15 +358,46 @@ function App({ campaignId }: AppProps) {
         </p>
       )}
 
-      <section className="mascots" aria-label="Questions">
+      <section className="question-list" aria-label="Questions">
         {questions.map((question) => (
-          <QuestionCard
-            key={question.id}
-            question={question}
-            isSelected={selectedQuestionId === question.id}
-            onSelect={setSelectedQuestionId}
-            hideTitle={questions.length === 1}
-          />
+          <section className="question-section" key={question.id} aria-label={question.title}>
+            <QuestionCard question={question} />
+            {question.questionType === 'text' && question.allowSuggestions ? (
+              <SuggestionForm
+                question={question}
+                onSubmitSuggestion={(answer) => handleSuggestionSubmit(question.id, answer)}
+              />
+            ) : question.questionType === 'text' ? (
+              <section className="suggestion-state suggestion-state--closed" aria-label={`Responses closed for ${question.title}`}>
+                <h2>{(question.numberOfVotes ?? 0) > 0 ? 'Suggestions are closed' : 'Text responses are closed'}</h2>
+                <p>
+                  {(question.numberOfVotes ?? 0) > 0
+                    ? 'This question is in voting-only mode. You can still review published candidates and cast votes.'
+                    : 'Submissions and voting are closed for this question.'}
+                </p>
+              </section>
+            ) : (
+              <QuestionResponseForm
+                question={question}
+                onSubmit={(answer) => handleQuestionResponseSubmit(question, answer)}
+              />
+            )}
+            {question.questionType !== 'text' && questionResponses.some((response) => response.questionId === question.id) && (
+              <section className="suggestion-board" aria-label={`Answer results for ${question.title}`}>
+                <h2>Responses</h2>
+                <ul>
+                  {questionResponses
+                    .filter((response) => response.questionId === question.id)
+                    .map((result) => (
+                      <li key={JSON.stringify(result.answer)}>
+                        <span>{Array.isArray(result.answer) ? result.answer.join(', ') : String(result.answer)}</span>
+                        <span>{result.count}</span>
+                      </li>
+                    ))}
+                </ul>
+              </section>
+            )}
+          </section>
         ))}
       </section>
 
@@ -386,45 +407,6 @@ function App({ campaignId }: AppProps) {
         maxVotesPerCandidate={campaign.maxVotesPerCandidate}
         votesUsed={voteRecords.length}
       />}
-
-      {selectedQuestion?.questionType === 'text' && selectedQuestion.allowSuggestions ? (
-        <SuggestionForm
-          questions={suggestionQuestions}
-          selectedQuestionId={selectedQuestion.id}
-          onQuestionChange={setSelectedQuestionId}
-          onSubmitSuggestion={handleSuggestionSubmit}
-        />
-      ) : selectedQuestion && selectedQuestion.questionType !== 'text' ? (
-        <QuestionResponseForm
-          key={selectedQuestion.id}
-          question={selectedQuestion}
-          onSubmit={(answer) => handleQuestionResponseSubmit(selectedQuestion, answer)}
-        />
-      ) : null}
-      {selectedQuestion?.questionType === 'text' && !selectedQuestion.allowSuggestions && (
-        <section className="suggestion-state suggestion-state--closed" aria-label="Suggestions closed">
-          <h2>{(selectedQuestion.numberOfVotes ?? 0) > 0 ? 'Suggestions are closed' : 'Text responses are closed'}</h2>
-          <p>
-            {(selectedQuestion.numberOfVotes ?? 0) > 0
-              ? 'This question is in voting-only mode. You can still review published candidates and cast votes.'
-              : 'Submissions and voting are closed for this question.'}
-          </p>
-        </section>
-      )}
-
-      {selectedQuestion && selectedQuestion.questionType !== 'text' && answerResults.length > 0 && (
-        <section className="suggestion-board" aria-label="Answer results">
-          <h2>Responses</h2>
-          <ul>
-            {answerResults.map((result) => (
-              <li key={JSON.stringify(result.answer)}>
-                <span>{Array.isArray(result.answer) ? result.answer.join(', ') : String(result.answer)}</span>
-                <span>{result.count}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
 
       {suggestionQuestions.length > 0 && (
         <SuggestionBoard
