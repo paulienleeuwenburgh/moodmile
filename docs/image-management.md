@@ -10,7 +10,7 @@ Use high-resolution source images so they stay sharp on large screens and in the
 
 | Image type | Recommended size | Preferred aspect ratio | Rendering behaviour |
 |---|---|---|---|
-| **Campaign banner** | `1600 × 900` px | `16:9` | Rendered as a wide hero image with `cover` cropping |
+| **Campaign banner** | `1600 × 900` px | `16:9` | Rendered at full width without cropping; include branding and title in the image |
 | **Question image** | `1600 × 900` px | `16:9` | Rendered prominently on the question card; lightbox shows the full image |
 | **Square question image** | `1200 × 1200` px | `1:1` | Rendered in a slightly taller card preview with center-crop |
 | **Portrait question image** | `1200 × 1500` px | `4:5` | Rendered in a portrait-friendly preview with full-image containment |
@@ -29,7 +29,7 @@ Use high-resolution source images so they stay sharp on large screens and in the
 
 | Entity | Field | Where it renders |
 |---|---|---|
-| **Campaign** | `bannerImageUrl` | Hero section (top of the campaign page) |
+| **Campaign** | `bannerImageUrl` (Edm.String) | Entire header of the campaign page, replacing the default purple box and text |
 | **Question** (category) | `imageUrl` | Question card thumbnail and suggestion board header |
 | **Suggestion** (candidate) | `imageUrl` | Candidate avatar in the suggestion board and leaderboard |
 
@@ -63,7 +63,7 @@ All image fields are **optional**. Missing values are handled gracefully — the
    - **Question image**: `questions` table → `PartitionKey = <campaignId>`, `RowKey = <questionId>`
    - **Candidate image**: `suggestions` table → `PartitionKey = '<campaignId>|<questionId>'`, `RowKey = <suggestionId>`
 4. Click **Edit entity**.
-5. Add or update the `imageUrl` (or `bannerImageUrl`) field with the new URL.
+5. Add or update the `imageUrl` (or `bannerImageUrl`) field as a **String** with the new URL.
 6. Click **Update**.
 
 The next page load will use the new image immediately — no restart required.
@@ -109,7 +109,7 @@ The API does not need the Azure Blob SDK. Images are served directly to browsers
 
 | Scenario | Behaviour |
 |---|---|
-| `bannerImageUrl` absent or empty | Hero section renders without a banner image |
+| `bannerImageUrl` absent, empty, or image fails to load | Default purple hero with MoodMile branding, campaign title, and description |
 | Question `imageUrl` absent | Question card renders without an image preview |
 | Candidate `imageUrl` absent | Candidate row renders without an avatar |
 | Invalid URL scheme | Image field is rejected at campaign creation/update time with a validation error |
@@ -120,9 +120,9 @@ The API does not need the Azure Blob SDK. Images are served directly to browsers
 
 ### Campaign banners
 
-- Banners are presented as wide hero media.
-- The hero preview uses `cover`, so `16:9` images produce the most predictable result.
-- Extremely tall or narrow banners may be center-cropped in the hero.
+- The banner replaces the entire purple hero, including the visible MoodMile branding, campaign title, and description. Put any desired text and branding in the image itself.
+- The full image is displayed at the available page width without cropping, including on narrow screens. A `16:9` landscape image is recommended to keep the header compact.
+- The campaign title and description remain available to screen readers and the title remains in the browser tab.
 
 ### Question images
 
