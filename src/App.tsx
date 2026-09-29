@@ -10,7 +10,6 @@ import type { Campaign, Question, Suggestion } from './types'
 import { ApiError, fetchCampaign, fetchQuestions, fetchSuggestions, fetchVoteCounts, postSuggestion, postVote } from './api'
 import { getSessionId } from './utils/sessionId'
 import { canCastVote, getClientVoteRecords } from './utils/voteLimits'
-import { handleImageError } from './utils/imageError'
 import { useDocumentTitle } from './hooks/useDocumentTitle'
 
 interface AppProps {
@@ -39,6 +38,7 @@ function App({ campaignId }: AppProps) {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [refreshSuccessMessage, setRefreshSuccessMessage] = useState('')
   const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null)
+  const [failedBannerUrl, setFailedBannerUrl] = useState<string | null>(null)
 
   const voteRecords = getClientVoteRecords(suggestions, voteCountById)
 
@@ -260,26 +260,34 @@ function App({ campaignId }: AppProps) {
     )
   }
 
+  const bannerImageUrl = campaign.bannerImageUrl?.trim()
+  const showBanner = Boolean(bannerImageUrl && failedBannerUrl !== bannerImageUrl)
+
   return (
     <main className="app-shell">
-      <section className="hero">
-        <div className="hero__content">
-          <p className="hero__eyebrow">MOODMILE</p>
-          <h1>{campaign.title}</h1>
-          <p>{campaign.description}</p>
-        </div>
-        {campaign.bannerImageUrl && (
-          <div className="hero__media">
-            <img
-              src={campaign.bannerImageUrl}
-              alt=""
-              aria-hidden="true"
-              className="hero__banner"
-              onError={handleImageError}
-            />
+      {showBanner ? (
+        <section className="hero hero--image">
+          <div className="hero__accessible-text">
+            <h1>{campaign.title}</h1>
+            <p>{campaign.description}</p>
           </div>
-        )}
-      </section>
+          <img
+            src={bannerImageUrl}
+            alt=""
+            aria-hidden="true"
+            className="hero__banner"
+            onError={() => setFailedBannerUrl(bannerImageUrl!)}
+          />
+        </section>
+      ) : (
+        <section className="hero">
+          <div className="hero__content">
+            <p className="hero__eyebrow">MOODMILE</p>
+            <h1>{campaign.title}</h1>
+            <p>{campaign.description}</p>
+          </div>
+        </section>
+      )}
 
       <section className="data-refresh" aria-label="Data refresh" aria-busy={isRefreshing}>
         <div className="data-refresh__meta">

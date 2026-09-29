@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
@@ -154,6 +154,36 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+
+describe('campaign header', () => {
+  it('uses the campaign image instead of the default purple header text', async () => {
+    setupApi([], [], { ...ninjaCampaign, bannerImageUrl: 'https://example.com/campaign-header.png' })
+    const { container } = render(<App campaignId="ninja-naming" />)
+
+    expect(await screen.findByRole('heading', { name: ninjaCampaign.title, level: 1 })).toBeInTheDocument()
+    expect(container.querySelector('.hero--image .hero__banner')).toHaveAttribute(
+      'src',
+      'https://example.com/campaign-header.png',
+    )
+    expect(container.querySelector('.hero__eyebrow')).not.toBeInTheDocument()
+    expect(document.title).toBe(`${ninjaCampaign.title} | MoodMile`)
+  })
+
+  it('keeps the default header without an image and restores it if the image fails', async () => {
+    setupApi()
+    const { container, rerender } = render(<App campaignId="ninja-naming" />)
+    expect(await screen.findByText('MOODMILE')).toBeInTheDocument()
+    expect(container.querySelector('.hero__banner')).not.toBeInTheDocument()
+
+    setupApi([], [], { ...ninjaCampaign, bannerImageUrl: 'https://example.com/broken.png' })
+    rerender(<App campaignId="different-campaign" />)
+    await waitFor(() => expect(container.querySelector('.hero__banner')).toHaveAttribute('src', 'https://example.com/broken.png'))
+    fireEvent.error(container.querySelector('.hero__banner')!)
+
+    expect(await screen.findByText('MOODMILE')).toBeInTheDocument()
+    expect(container.querySelector('.hero__banner')).not.toBeInTheDocument()
+  })
+})
 
 describe('vote targeting', () => {
   it('voting Hanzo only changes Hanzo', async () => {
