@@ -1407,7 +1407,7 @@ describe('maxVotesPerCandidate', () => {
   }
 
   const multiVoteQuestions: Question[] = [
-    { id: 'nominees', campaignId: 'best-padeller-2026', title: 'Nominees', description: 'desc', sortOrder: 1, questionType: 'text', allowSuggestions: true, numberOfVotes: 3, duplicateVotingAllowed: true },
+    { id: 'nominees', campaignId: 'best-padeller-2026', title: 'Nominees', description: 'desc', status: 'active', sortOrder: 1, questionType: 'text', allowSuggestions: true, numberOfVotes: 3, duplicateVotingAllowed: true },
   ]
 
   const alice: Suggestion = {
