@@ -326,10 +326,7 @@ async function collectCampaignAdminData(campaignId: string) {
   for await (const entity of questionsClient.listEntities<QuestionEntity>({
     queryOptions: { filter: `PartitionKey eq '${escapeODataString(campaignId)}'` },
   })) {
-    const legacyQuestion = entity.allowSuggestions === undefined
-      ? await getQuestionConfig(campaignId, String(entity.rowKey))
-      : undefined
-    questions.push(legacyQuestion ?? entityToQuestion(entity))
+    questions.push(entityToQuestion(entity))
   }
   questions.sort((a, b) => a.sortOrder - b.sortOrder)
   const questionTitles = new Map(questions.map((question) => [question.id, question.title]))

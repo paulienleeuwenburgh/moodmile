@@ -1,7 +1,6 @@
 export type ResponseAnswer = string | string[] | boolean | number
 export type QuestionType =
-  | 'categorical-single'
-  | 'categorical-multiple'
+  | 'categorical'
   | 'boolean'
   | 'ordinal'
   | 'numeric'
@@ -10,15 +9,17 @@ export type QuestionType =
 export interface QuestionConfig {
   questionType: QuestionType
   allowSuggestions: boolean
-  allowVoting?: boolean
+  required?: boolean
+  maxSize?: number
+  numberOfVotes?: number
+  duplicateVotingAllowed?: boolean
   options?: string[]
   numericMin?: number
   numericMax?: number
 }
 
 const QUESTION_TYPES: readonly QuestionType[] = [
-  'categorical-single',
-  'categorical-multiple',
+  'categorical',
   'boolean',
   'ordinal',
   'numeric',
@@ -33,7 +34,7 @@ export function validateQuestion(question: Partial<QuestionConfig>): string[] {
   }
 
   const choices = question.options
-  if (question.questionType === 'categorical-single' || question.questionType === 'categorical-multiple' || question.questionType === 'ordinal') {
+  if (question.questionType === 'categorical' || question.questionType === 'ordinal') {
     if (!Array.isArray(choices) || choices.length < 2 || choices.some((choice) => typeof choice !== 'string' || !choice.trim())) {
       errors.push('This question type requires at least two non-empty options.')
     } else if (new Set(choices.map((choice) => choice.trim().toLocaleLowerCase())).size !== choices.length) {
@@ -61,11 +62,35 @@ export function validateQuestion(question: Partial<QuestionConfig>): string[] {
     errors.push('Numeric bounds are only supported for numeric questions.')
   }
 
-  if (question.questionType !== 'text' && question.allowVoting !== undefined) {
-    errors.push('allowVoting is only supported for text questions.')
+  if (question.required !== undefined && typeof question.required !== 'boolean') {
+    errors.push('required must be a boolean.')
   }
-  if (question.allowVoting !== undefined && typeof question.allowVoting !== 'boolean') {
-    errors.push('allowVoting must be a boolean.')
+  if (question.questionType === 'text') {
+    if (question.maxSize !== undefined && (!Number.isInteger(question.maxSize) || question.maxSize < 1)) {
+      errors.push('maxSize must be a positive integer.')
+    }
+    if (question.numberOfVotes !== undefined && (!Number.isInteger(question.numberOfVotes) || question.numberOfVotes < 0)) {
+      errors.push('numberOfVotes must be a non-negative integer.')
+    }
+    if (question.duplicateVotingAllowed !== undefined && typeof question.duplicateVotingAllowed !== 'boolean') {
+      errors.push('duplicateVotingAllowed must be a boolean.')
+    }
+  } else if (question.questionType === 'categorical') {
+    if (question.numberOfVotes !== undefined && (!Number.isInteger(question.numberOfVotes) || question.numberOfVotes < 1)) {
+      errors.push('numberOfVotes must be a positive integer for categorical questions.')
+    }
+    if (question.duplicateVotingAllowed !== undefined && typeof question.duplicateVotingAllowed !== 'boolean') {
+      errors.push('duplicateVotingAllowed must be a boolean.')
+    }
+    if (question.maxSize !== undefined) {
+      errors.push('maxSize is only supported for text questions.')
+    }
+  } else if (
+    question.maxSize !== undefined ||
+    question.numberOfVotes !== undefined ||
+    question.duplicateVotingAllowed !== undefined
+  ) {
+    errors.push('Text and categorical voting settings are not supported for this question type.')
   }
   if (typeof question.allowSuggestions !== 'boolean') {
     errors.push('allowSuggestions must be a boolean.')
@@ -76,20 +101,21 @@ export function validateQuestion(question: Partial<QuestionConfig>): string[] {
 
 export function validateResponse(question: QuestionConfig, answer: unknown): string | undefined {
   switch (question.questionType) {
-    case 'categorical-single':
     case 'ordinal':
       if (typeof answer !== 'string' || !question.options?.includes(answer)) {
         return 'Choose one of the available options.'
       }
       return
-    case 'categorical-multiple':
+    case 'categorical':
+      const maxSelections = question.numberOfVotes ?? 1
       if (
         !Array.isArray(answer) ||
-        answer.length === 0 ||
+        (question.required === true && answer.length === 0) ||
+        answer.length > maxSelections ||
         answer.some((item) => typeof item !== 'string' || !question.options?.includes(item)) ||
-        new Set(answer).size !== answer.length
+        (question.duplicateVotingAllowed !== true && new Set(answer).size !== answer.length)
       ) {
-        return 'Choose one or more unique available options.'
+        return `Choose up to ${maxSelections} available option${maxSelections === 1 ? '' : 's'}${question.duplicateVotingAllowed ? '' : ' without duplicates'}.`
       }
       return
     case 'boolean':
@@ -106,11 +132,12 @@ export function validateResponse(question: QuestionConfig, answer: unknown): str
       }
       return
     case 'text':
-      if (typeof answer !== 'string' || !answer.trim()) {
+      if (typeof answer !== 'string' || (question.required === true && !answer.trim())) {
         return 'Answer must not be empty.'
       }
-      if (Array.from(answer).length > 250) {
-        return 'Answers can be up to 250 characters long.'
+      const maxSize = question.maxSize ?? 250
+      if (Array.from(answer).length > maxSize) {
+        return `Answers can be up to ${maxSize} characters long.`
       }
       if (/[<>]/u.test(answer)) {
         return 'Answers cannot contain angle brackets.'

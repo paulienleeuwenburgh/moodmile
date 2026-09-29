@@ -20,8 +20,7 @@ export interface Campaign {
 }
 
 export type QuestionType =
-  | 'categorical-single'
-  | 'categorical-multiple'
+  | 'categorical'
   | 'boolean'
   | 'ordinal'
   | 'numeric'
@@ -34,7 +33,10 @@ export interface Question {
   description: string
   questionType: QuestionType
   allowSuggestions: boolean
-  allowVoting?: boolean
+  required?: boolean
+  maxSize?: number
+  numberOfVotes?: number
+  duplicateVotingAllowed?: boolean
   options?: string[]
   numericMin?: number
   numericMax?: number

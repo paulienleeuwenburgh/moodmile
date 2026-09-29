@@ -72,7 +72,6 @@ export interface CampaignEntity {
   title: string
   description: string
   status: string       // 'draft' | 'active' | 'closed'
-  allowSuggestions?: boolean // Legacy field used only to migrate existing campaigns.
   maxVotesTotal: number
   maxVotesPerCategory: number
   maxVotesPerCandidate: number
@@ -100,7 +99,10 @@ export interface QuestionEntity {
   description: string
   questionType?: QuestionType
   allowSuggestions?: boolean
-  allowVoting?: boolean
+  required?: boolean
+  maxSize?: number
+  numberOfVotes?: number
+  duplicateVotingAllowed?: boolean
   options?: string
   numericMin?: number
   numericMax?: number
@@ -152,7 +154,10 @@ export function entityToQuestion(entity: TableEntityResult<QuestionEntity>) {
     description: entity.description,
     questionType: entity.questionType ?? 'text',
     allowSuggestions: entity.allowSuggestions ?? true,
-    allowVoting: entity.allowVoting ?? (entity.questionType === undefined ? true : undefined),
+    required: entity.required ?? false,
+    maxSize: entity.maxSize ?? 250,
+    numberOfVotes: entity.numberOfVotes ?? (entity.questionType === 'categorical' ? 1 : 0),
+    duplicateVotingAllowed: entity.duplicateVotingAllowed ?? false,
     options,
     numericMin: entity.numericMin,
     numericMax: entity.numericMax,

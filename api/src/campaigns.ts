@@ -3,7 +3,6 @@ import {
   getCampaignsClient,
   ensureTableExists,
   entityToCampaignConfig,
-  type CampaignEntity,
   entityToQuestion,
   getQuestionsClient,
   type QuestionEntity,
@@ -31,16 +30,6 @@ export async function getQuestionConfig(campaignId: string, questionId: string) 
   try {
     const entity = await questionsClient.getEntity<QuestionEntity>(campaignId, questionId)
     const question = entityToQuestion(entity)
-    if (entity.allowSuggestions === undefined) {
-      try {
-        const legacyCampaign = await campaignsClient.getEntity<CampaignEntity>('campaign', campaignId)
-        question.allowSuggestions = Boolean(legacyCampaign.allowSuggestions)
-        question.allowVoting = true
-      } catch {
-        question.allowSuggestions = false
-        question.allowVoting = true
-      }
-    }
     const errors = validateQuestion(question)
     if (errors.length > 0) {
       throw new Error(`Invalid question configuration for "${questionId}": ${errors.join(' ')}`)
