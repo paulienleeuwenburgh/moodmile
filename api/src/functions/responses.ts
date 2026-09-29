@@ -25,7 +25,8 @@ async function getResponses(request: HttpRequest, _context: InvocationContext): 
     } catch {
       continue
     }
-    const key = JSON.stringify([entity.questionId, answer])
+    const aggregateAnswer = Array.isArray(answer) ? [...answer].sort() : answer
+    const key = JSON.stringify([entity.questionId, aggregateAnswer])
     const existing = grouped.get(key)
     if (existing) {
       existing.count += 1

@@ -107,12 +107,15 @@ describe('typed response API', () => {
         yield { questionId: 'colors', answer: '"Red"' }
         yield { questionId: 'colors', answer: '"Red"' }
         yield { questionId: 'colors', answer: '"Blue"' }
+        yield { questionId: 'multiple', answer: '["Red","Blue"]' }
+        yield { questionId: 'multiple', answer: '["Blue","Red"]' }
       },
     })
     const response = await getHandler({ query: { get: () => 'campaign-1' } }, {})
     expect(response.jsonBody).toEqual([
       { questionId: 'colors', answer: 'Red', count: 2 },
       { questionId: 'colors', answer: 'Blue', count: 1 },
+      { questionId: 'multiple', answer: ['Red', 'Blue'], count: 2 },
     ])
     expect(JSON.stringify(response.jsonBody)).not.toContain('sessionId')
   })

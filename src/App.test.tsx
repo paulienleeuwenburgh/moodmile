@@ -1198,6 +1198,39 @@ describe('typed questions', () => {
     expect(screen.queryByRole('button', { name: /vote for rocket/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('complementary', { name: /voting rules/i })).not.toBeInTheDocument()
   })
+
+  it('clears an in-progress answer when switching questions', async () => {
+    const questions: Question[] = [
+      {
+        id: 'color',
+        campaignId: 'ninja-naming',
+        title: 'Favorite color?',
+        description: '',
+        sortOrder: 1,
+        questionType: 'categorical-single',
+        allowSuggestions: false,
+        options: ['Red', 'Blue'],
+      },
+      {
+        id: 'animal',
+        campaignId: 'ninja-naming',
+        title: 'Favorite animal?',
+        description: '',
+        sortOrder: 2,
+        questionType: 'categorical-single',
+        allowSuggestions: false,
+        options: ['Cat', 'Dog'],
+      },
+    ]
+    setupApi([], [], ninjaCampaign, questions)
+    render(<App campaignId="ninja-naming" />)
+
+    await userEvent.click(await screen.findByRole('radio', { name: 'Blue' }))
+    await userEvent.click(screen.getByRole('button', { name: /favorite animal/i }))
+
+    expect(screen.getByRole('radio', { name: 'Cat' })).not.toBeChecked()
+    expect(screen.getByRole('radio', { name: 'Dog' })).not.toBeChecked()
+  })
 })
 
 // ---------------------------------------------------------------------------

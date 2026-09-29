@@ -393,6 +393,7 @@ function App({ campaignId }: AppProps) {
         />
       ) : selectedQuestion && selectedQuestion.questionType !== 'text' ? (
         <QuestionResponseForm
+          key={selectedQuestion.id}
           question={selectedQuestion}
           onSubmit={(answer) => handleQuestionResponseSubmit(selectedQuestion, answer)}
         />
