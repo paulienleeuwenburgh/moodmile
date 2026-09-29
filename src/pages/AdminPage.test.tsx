@@ -72,7 +72,8 @@ describe('AdminPage document title', () => {
         sortOrder: 1,
         questionType: 'text',
         allowSuggestions: true,
-        allowVoting: true,
+        numberOfVotes: 1,
+        duplicateVotingAllowed: false,
       },
     ])
     mockFetchSuggestions.mockResolvedValue([])

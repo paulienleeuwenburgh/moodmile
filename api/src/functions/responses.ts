@@ -52,8 +52,8 @@ async function postResponse(request: HttpRequest, _context: InvocationContext): 
   const campaignId = body.campaignId?.trim()
   const questionId = body.questionId?.trim()
   const sessionId = body.sessionId?.trim()
-  if (!campaignId || !questionId || !sessionId || body.answer === undefined) {
-    return { status: 400, jsonBody: { error: 'campaignId, questionId, sessionId and answer are required' } }
+  if (!campaignId || !questionId || !sessionId) {
+    return { status: 400, jsonBody: { error: 'campaignId, questionId and sessionId are required' } }
   }
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(sessionId)) {
     return { status: 400, jsonBody: { error: 'sessionId must be a valid UUID' } }
@@ -74,6 +74,19 @@ async function postResponse(request: HttpRequest, _context: InvocationContext): 
 
   const client = getQuestionResponsesClient()
   await ensureTableExists(client)
+  const unanswered =
+    body.answer === undefined ||
+    body.answer === null ||
+    (typeof body.answer === 'string' && !body.answer.trim()) ||
+    (Array.isArray(body.answer) && body.answer.length === 0)
+  if (unanswered) {
+    try {
+      await client.deleteEntity(responsePartitionKey(campaignId, questionId), sessionId)
+    } catch {
+      // No prior answer exists to clear.
+    }
+    return { status: 200, jsonBody: { success: true } }
+  }
   await client.upsertEntity(
     {
       partitionKey: responsePartitionKey(campaignId, questionId),

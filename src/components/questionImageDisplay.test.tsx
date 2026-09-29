@@ -25,7 +25,8 @@ function createQuestion(id: string): Question {
     description: 'Description',
     questionType: 'text',
     allowSuggestions: true,
-    allowVoting: true,
+    numberOfVotes: 1,
+    duplicateVotingAllowed: false,
     imageUrl: `/images/${id}.png`,
     sortOrder: 1,
   }

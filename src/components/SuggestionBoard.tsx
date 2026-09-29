@@ -1,8 +1,7 @@
-import type { Campaign, Question, Suggestion } from '../types'
+import type { Question, Suggestion } from '../types'
 import { handleImageError } from '../utils/imageError'
 
 interface SuggestionBoardProps {
-  campaign: Campaign
   questions: Question[]
   suggestions: Suggestion[]
   voteCountById: Map<string, number>
@@ -11,14 +10,12 @@ interface SuggestionBoardProps {
 }
 
 export function SuggestionBoard({
-  campaign,
   questions,
   suggestions,
   voteCountById,
   onVote,
   isVoteDisabled,
 }: SuggestionBoardProps) {
-  const usesSingleVoteButton = campaign.maxVotesPerCandidate === 1
   const hasMultipleQuestions = questions.length > 1
   const showQuestionImages = hasMultipleQuestions
   const boardTitle = 'Suggestions by question'
@@ -35,6 +32,7 @@ export function SuggestionBoard({
           const questionSuggestions = suggestions
             .filter((suggestion) => suggestion.questionId === question.id)
             .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+          const usesSingleVoteButton = !question.duplicateVotingAllowed
 
           return (
             <article key={question.id} className="suggestion-group">
@@ -72,7 +70,7 @@ export function SuggestionBoard({
                     return (
                       <li key={suggestion.id} className="suggestion-card">
                         <span className="suggestion-card__name">{suggestion.name}</span>
-                        {question.allowVoting ? <div className="vote-actions">
+                        {(question.numberOfVotes ?? 0) > 0 ? <div className="vote-actions">
                           <button
                             type="button"
                             className={`vote-btn${usesSingleVoteButton && hasVotes ? ' vote-btn--voted' : ''}`}

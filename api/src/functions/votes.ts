@@ -123,7 +123,7 @@ async function postVote(
   if (!question) {
     return { status: 404, jsonBody: { error: 'Question not found' } }
   }
-  if (!revoke && (question.questionType !== 'text' || !question.allowVoting)) {
+  if (!revoke && (question.questionType !== 'text' || (question.numberOfVotes ?? 0) <= 0)) {
     return { status: 403, jsonBody: { error: 'Voting is not enabled for this question' } }
   }
 
@@ -182,7 +182,14 @@ async function postVote(
     return { status: 200, jsonBody: updated, headers: { 'Content-Type': 'application/json' } }
   }
 
-  const voteCheck = canCastVote(campaign, voteRecords, questionId, suggestionId)
+  const voteCheck = canCastVote(
+    campaign,
+    voteRecords,
+    questionId,
+    suggestionId,
+    question.numberOfVotes ?? 0,
+    question.duplicateVotingAllowed ?? false,
+  )
   if (!voteCheck.allowed) {
     return {
       status: 409,
@@ -194,7 +201,7 @@ async function postVote(
   // Use rowKey = suggestionId for single-vote-per-candidate campaigns, a unique
   // key otherwise so multiple votes for the same candidate don't collide.
   const voteRowKey =
-    campaign.maxVotesPerCandidate === 1
+    !question.duplicateVotingAllowed
       ? suggestionId
       : `${suggestionId}|${crypto.randomUUID()}`
   const createdAt = new Date().toISOString()

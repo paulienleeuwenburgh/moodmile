@@ -22,7 +22,9 @@ export function SuggestionForm({
 }: SuggestionFormProps) {
   const [suggestion, setSuggestion] = useState('')
   const [validationError, setValidationError] = useState('')
-  const remainingCharacters = SUGGESTION_MAX_LENGTH - countSuggestionCharacters(suggestion)
+  const selectedQuestion = questions.find((question) => question.id === selectedQuestionId)
+  const maxSize = selectedQuestion?.maxSize ?? SUGGESTION_MAX_LENGTH
+  const remainingCharacters = maxSize - countSuggestionCharacters(suggestion)
   const characterCountMessage = remainingCharacters < 0
     ? `${Math.abs(remainingCharacters)} character${Math.abs(remainingCharacters) === 1 ? '' : 's'} over limit`
     : `${remainingCharacters} character${remainingCharacters === 1 ? '' : 's'} left`
@@ -32,17 +34,22 @@ export function SuggestionForm({
 
   const handleChange = (value: string) => {
     setSuggestion(value)
-    setValidationError(validateSuggestion(value))
+    setValidationError(validateSuggestion(value, maxSize))
   }
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const trimmedSuggestion = suggestion.trim()
-    if (!trimmedSuggestion) {
+    if (!trimmedSuggestion && !selectedQuestion?.required) {
       return
     }
 
-    const error = validateSuggestion(trimmedSuggestion)
+    if (!trimmedSuggestion) {
+      setValidationError('Please provide an answer.')
+      return
+    }
+
+    const error = validateSuggestion(trimmedSuggestion, maxSize)
     if (error) {
       setValidationError(error)
       return
@@ -61,7 +68,11 @@ export function SuggestionForm({
         <select
           id="question-select"
           value={selectedQuestionId}
-          onChange={(event) => onQuestionChange(event.target.value)}
+          onChange={(event) => {
+            setSuggestion('')
+            setValidationError('')
+            onQuestionChange(event.target.value)
+          }}
         >
           {questions.map((question) => (
             <option key={question.id} value={question.id}>
@@ -77,6 +88,8 @@ export function SuggestionForm({
           value={suggestion}
           onChange={(event) => handleChange(event.target.value)}
           placeholder="e.g. Sunny Stride"
+          maxLength={maxSize}
+          required={selectedQuestion?.required}
           aria-describedby={describedBy}
           aria-invalid={!!validationError}
         />

@@ -17,20 +17,30 @@ export function canCastVote(
   votes: VoteRecord[],
   questionId: string,
   suggestionId: string,
+  numberOfVotes = 0,
+  duplicateVotingAllowed = false,
 ): { allowed: true } | { allowed: false; error: string } {
+  if (numberOfVotes <= 0) {
+    return { allowed: false, error: 'Voting is not enabled for this question' }
+  }
+
   const candidateVoteCount = votes.filter((vote) => vote.suggestionId === suggestionId).length
-  if (campaign.maxVotesPerCandidate > 0 && candidateVoteCount >= campaign.maxVotesPerCandidate) {
+  const maxVotesPerCandidate = duplicateVotingAllowed ? campaign.maxVotesPerCandidate : 1
+  if (maxVotesPerCandidate > 0 && candidateVoteCount >= maxVotesPerCandidate) {
     return {
       allowed: false,
-      error: `You have already cast the maximum of ${campaign.maxVotesPerCandidate} vote(s) for this candidate`,
+      error: `You have already cast the maximum of ${maxVotesPerCandidate} vote(s) for this candidate`,
     }
   }
 
   const categoryVoteCount = votes.filter((vote) => vote.questionId === questionId).length
-  if (campaign.maxVotesPerCategory > 0 && categoryVoteCount >= campaign.maxVotesPerCategory) {
+  const maxVotesPerCategory = campaign.maxVotesPerCategory > 0
+    ? Math.min(campaign.maxVotesPerCategory, numberOfVotes)
+    : numberOfVotes
+  if (categoryVoteCount >= maxVotesPerCategory) {
     return {
       allowed: false,
-      error: `You have reached the maximum of ${campaign.maxVotesPerCategory} vote(s) for this category`,
+      error: `You have reached the maximum of ${maxVotesPerCategory} vote(s) for this category`,
     }
   }
 

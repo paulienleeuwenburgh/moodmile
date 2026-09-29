@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { mockAppHttp, mockEnsureTableExists, mockGetQuestionConfig, mockUpsertEntity, mockListEntities } = vi.hoisted(() => ({
+const { mockAppHttp, mockEnsureTableExists, mockGetQuestionConfig, mockUpsertEntity, mockDeleteEntity, mockListEntities } = vi.hoisted(() => ({
   mockAppHttp: vi.fn(),
   mockEnsureTableExists: vi.fn(),
   mockGetQuestionConfig: vi.fn(),
   mockUpsertEntity: vi.fn(),
+  mockDeleteEntity: vi.fn(),
   mockListEntities: vi.fn(),
 }))
 
@@ -14,6 +15,7 @@ vi.mock('../tableClient', () => ({
   ensureTableExists: mockEnsureTableExists,
   getQuestionResponsesClient: vi.fn(() => ({
     upsertEntity: mockUpsertEntity,
+    deleteEntity: mockDeleteEntity,
     listEntities: mockListEntities,
   })),
 }))
@@ -32,20 +34,22 @@ describe('typed response API', () => {
     vi.clearAllMocks()
     mockEnsureTableExists.mockResolvedValue(undefined)
     mockUpsertEntity.mockResolvedValue(undefined)
+    mockDeleteEntity.mockResolvedValue(undefined)
   })
 
   it('persists a valid structured answer keyed by campaign, question, and session', async () => {
     mockGetQuestionConfig.mockResolvedValue({
-      questionType: 'categorical-single',
+      questionType: 'categorical',
       options: ['Red', 'Blue'],
       allowSuggestions: false,
+      numberOfVotes: 1,
     })
     const response = await postHandler(
       request({
         campaignId: 'campaign-1',
         questionId: 'colors',
         sessionId: '00000000-0000-4000-8000-000000000001',
-        answer: 'Red',
+        answer: ['Red'],
       }),
       {},
     )
@@ -55,7 +59,7 @@ describe('typed response API', () => {
       expect.objectContaining({
         partitionKey: 'campaign-1|colors',
         rowKey: '00000000-0000-4000-8000-000000000001',
-        answer: '"Red"',
+        answer: '["Red"]',
       }),
       'Replace',
     )
@@ -63,7 +67,7 @@ describe('typed response API', () => {
 
   it('rejects answers that do not match the question configuration', async () => {
     mockGetQuestionConfig.mockResolvedValue({
-      questionType: 'categorical-single',
+      questionType: 'categorical',
       options: ['Red', 'Blue'],
       allowSuggestions: false,
     })
@@ -72,7 +76,7 @@ describe('typed response API', () => {
         campaignId: 'campaign-1',
         questionId: 'colors',
         sessionId: '00000000-0000-4000-8000-000000000001',
-        answer: 'Green',
+        answer: ['Green'],
       }),
       {},
     )
@@ -85,7 +89,8 @@ describe('typed response API', () => {
     mockGetQuestionConfig.mockResolvedValue({
       questionType: 'text',
       allowSuggestions: true,
-      allowVoting: true,
+      numberOfVotes: 1,
+      maxSize: 250,
     })
     const response = await postHandler(
       request({

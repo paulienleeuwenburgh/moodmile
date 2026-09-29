@@ -136,6 +136,7 @@ export function entityToCampaignConfig(entity: TableEntityResult<CampaignEntity>
 }
 
 export function entityToQuestion(entity: TableEntityResult<QuestionEntity>) {
+  const questionType = entity.questionType ?? 'text'
   let options: string[] | undefined
   if (typeof entity.options === 'string') {
     try {
@@ -152,12 +153,16 @@ export function entityToQuestion(entity: TableEntityResult<QuestionEntity>) {
     campaignId: entity.partitionKey as string,
     title: entity.title,
     description: entity.description,
-    questionType: entity.questionType ?? 'text',
+    questionType,
     allowSuggestions: entity.allowSuggestions ?? true,
     required: entity.required ?? false,
-    maxSize: entity.maxSize ?? 250,
-    numberOfVotes: entity.numberOfVotes ?? (entity.questionType === 'categorical' ? 1 : 0),
-    duplicateVotingAllowed: entity.duplicateVotingAllowed ?? false,
+    maxSize: questionType === 'text' ? entity.maxSize ?? 250 : undefined,
+    numberOfVotes: questionType === 'text' ? entity.numberOfVotes ?? 0
+      : questionType === 'categorical' ? entity.numberOfVotes ?? 1
+        : undefined,
+    duplicateVotingAllowed: questionType === 'text' || questionType === 'categorical'
+      ? entity.duplicateVotingAllowed ?? false
+      : undefined,
     options,
     numericMin: entity.numericMin,
     numericMax: entity.numericMax,

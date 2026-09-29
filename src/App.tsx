@@ -180,9 +180,9 @@ function App({ campaignId }: AppProps) {
     const suggestion = suggestions.find((s) => s.id === suggestionId)
     if (!suggestion) return
     const question = questions.find((item) => item.id === suggestion.questionId)
-    if (!question || question.questionType !== 'text' || !question.allowVoting) return
+    if (!question || question.questionType !== 'text' || (question.numberOfVotes ?? 0) <= 0) return
 
-    if (!revoke && !canCastVote(currentCampaign, voteRecords, suggestion.questionId, suggestion.id)) {
+    if (!revoke && !canCastVote(currentCampaign, voteRecords, suggestion.questionId, suggestion.id, question)) {
       return
     }
 
@@ -239,14 +239,14 @@ function App({ campaignId }: AppProps) {
       return false
     }
     const question = questions.find((item) => item.id === suggestion.questionId)
-    if (!question || question.questionType !== 'text' || !question.allowVoting) {
+    if (!question || question.questionType !== 'text' || (question.numberOfVotes ?? 0) <= 0) {
       return true
     }
-    if (campaign.maxVotesPerCandidate === 1 && (voteCountById.get(suggestionId) ?? 0) > 0) {
+    if (!question.duplicateVotingAllowed && (voteCountById.get(suggestionId) ?? 0) > 0) {
       return false
     }
 
-    return !canCastVote(campaign, voteRecords, suggestion.questionId, suggestion.id)
+    return !canCastVote(campaign, voteRecords, suggestion.questionId, suggestion.id, question)
   }
 
   if (campaignNotFound) {
@@ -287,7 +287,7 @@ function App({ campaignId }: AppProps) {
   const showBanner = Boolean(bannerImageUrl && failedBannerUrl !== bannerImageUrl)
   const selectedQuestion = questions.find((question) => question.id === selectedQuestionId)
   const suggestionQuestions = questions.filter((question) => question.questionType === 'text')
-  const votableQuestions = suggestionQuestions.filter((question) => question.allowVoting)
+  const votableQuestions = suggestionQuestions.filter((question) => (question.numberOfVotes ?? 0) > 0)
   const visibleSuggestions = suggestions.filter((suggestion) => votableQuestions.some((question) => question.id === suggestion.questionId))
   const answerResults = selectedQuestion
     ? questionResponses.filter((response) => response.questionId === selectedQuestion.id)
@@ -377,7 +377,7 @@ function App({ campaignId }: AppProps) {
         ))}
       </section>
 
-      {questions.some((question) => question.questionType === 'text' && question.allowVoting) && <VotingRules
+      {questions.some((question) => question.questionType === 'text' && (question.numberOfVotes ?? 0) > 0) && <VotingRules
         maxVotesTotal={campaign.maxVotesTotal}
         maxVotesPerCategory={campaign.maxVotesPerCategory}
         maxVotesPerCandidate={campaign.maxVotesPerCandidate}
@@ -400,9 +400,9 @@ function App({ campaignId }: AppProps) {
       ) : null}
       {selectedQuestion?.questionType === 'text' && !selectedQuestion.allowSuggestions && (
         <section className="suggestion-state suggestion-state--closed" aria-label="Suggestions closed">
-          <h2>{selectedQuestion.allowVoting ? 'Suggestions are closed' : 'Text responses are closed'}</h2>
+          <h2>{(selectedQuestion.numberOfVotes ?? 0) > 0 ? 'Suggestions are closed' : 'Text responses are closed'}</h2>
           <p>
-            {selectedQuestion.allowVoting
+            {(selectedQuestion.numberOfVotes ?? 0) > 0
               ? 'This question is in voting-only mode. You can still review published candidates and cast votes.'
               : 'Submissions and voting are closed for this question.'}
           </p>
@@ -425,7 +425,6 @@ function App({ campaignId }: AppProps) {
 
       {suggestionQuestions.length > 0 && (
         <SuggestionBoard
-          campaign={campaign}
           questions={suggestionQuestions}
           suggestions={suggestions.filter((suggestion) => suggestionQuestions.some((question) => question.id === suggestion.questionId))}
           voteCountById={voteCountById}
@@ -436,7 +435,6 @@ function App({ campaignId }: AppProps) {
 
       {votableQuestions.length > 0 && (
         <Leaderboard
-          campaign={campaign}
           questions={votableQuestions}
           suggestions={visibleSuggestions}
           voteCountById={voteCountById}

@@ -100,6 +100,15 @@ export function validateQuestion(question: Partial<QuestionConfig>): string[] {
 }
 
 export function validateResponse(question: QuestionConfig, answer: unknown): string | undefined {
+  const unanswered =
+    answer === undefined ||
+    answer === null ||
+    (typeof answer === 'string' && !answer.trim()) ||
+    (Array.isArray(answer) && answer.length === 0)
+  if (unanswered) {
+    return question.required === true ? 'An answer is required.' : undefined
+  }
+
   switch (question.questionType) {
     case 'ordinal':
       if (typeof answer !== 'string' || !question.options?.includes(answer)) {
@@ -110,7 +119,6 @@ export function validateResponse(question: QuestionConfig, answer: unknown): str
       const maxSelections = question.numberOfVotes ?? 1
       if (
         !Array.isArray(answer) ||
-        (question.required === true && answer.length === 0) ||
         answer.length > maxSelections ||
         answer.some((item) => typeof item !== 'string' || !question.options?.includes(item)) ||
         (question.duplicateVotingAllowed !== true && new Set(answer).size !== answer.length)
@@ -132,7 +140,7 @@ export function validateResponse(question: QuestionConfig, answer: unknown): str
       }
       return
     case 'text':
-      if (typeof answer !== 'string' || (question.required === true && !answer.trim())) {
+      if (typeof answer !== 'string') {
         return 'Answer must not be empty.'
       }
       const maxSize = question.maxSize ?? 250

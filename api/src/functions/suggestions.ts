@@ -56,11 +56,6 @@ async function postSuggestion(
     return { status: 400, jsonBody: { error: 'campaignId, questionId and name are required' } }
   }
 
-  const validationError = validateSuggestion(name)
-  if (validationError) {
-    return { status: 400, jsonBody: { error: validationError } }
-  }
-
   const question = await getQuestionConfig(campaignId, questionId)
   if (!question) {
     return { status: 404, jsonBody: { error: 'Question not found' } }
@@ -68,6 +63,10 @@ async function postSuggestion(
 
   if (question.questionType !== 'text') {
     return { status: 400, jsonBody: { error: 'Suggestions are only supported for text questions' } }
+  }
+  const validationError = validateSuggestion(name, question.maxSize ?? 250)
+  if (validationError) {
+    return { status: 400, jsonBody: { error: validationError } }
   }
   if (!question.allowSuggestions) {
     return { status: 403, jsonBody: { error: 'Suggestions are not allowed for this question' } }

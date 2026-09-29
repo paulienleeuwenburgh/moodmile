@@ -112,9 +112,12 @@ Stores questions (categories) for a campaign. Each row is one question.
 | `description` | string | Short description shown on the question card |
 | `imageUrl` | string | Optional. Path to question image (e.g. `/mascots/ninja1.png`). Leave empty for no image — the card renders gracefully without one. Use a `16:9` landscape image where possible for the most consistent preview. |
 | `sortOrder` | int | Questions are sorted ascending by this value |
-| `questionType` | string | `categorical-single`, `categorical-multiple`, `boolean`, `ordinal`, `numeric`, or `text` |
-| `allowSuggestions` | bool | On text questions, whether users may suggest text candidates |
-| `allowVoting` | bool | Optional; only valid for text questions. Enables votes for text suggestions |
+| `questionType` | string | `categorical`, `boolean`, `ordinal`, `numeric`, or `text` |
+| `required` | bool | Optional; requires an answer when `true` (default `false`) |
+| `allowSuggestions` | bool | Text only; whether users may suggest text candidates |
+| `maxSize` | int | Text only; maximum suggestion length (default `250`) |
+| `numberOfVotes` | int | Text: votes allowed per participant (`0` disables voting; default `0`). Categorical: maximum selections per participant (default `1`) |
+| `duplicateVotingAllowed` | bool | Text/Categorical only; permits voting for the same candidate/option multiple times (default `false`) |
 | `options` | JSON string | JSON-encoded string array required for categorical and ordinal questions; ordinal order is preserved |
 | `numericMin`, `numericMax` | number | Optional inclusive bounds for numeric answers |
 | `createdAt` | string | ISO 8601 timestamp |
@@ -149,8 +152,8 @@ Tracks which suggestions each browser session has voted for.
 ### `questionResponses` table
 
 Stores one replaceable answer per browser session and structured question. Text questions use
-the `suggestions` table instead; their submitted text can be voted on only when `allowVoting`
-is enabled on that question.
+the `suggestions` table instead; their `numberOfVotes` setting determines whether and how many
+votes each participant may cast for that question.
 
 | Property | Type | Notes |
 |---|---|---|
@@ -159,8 +162,9 @@ is enabled on that question.
 | `answer` | string | JSON-serialized string, string array, boolean, or number |
 | `createdAt` | string | ISO 8601 timestamp |
 
-Categorical single-choice and ordinal answers must match an option; multiple-choice answers
-must contain one or more unique configured options. Boolean answers are `true`/`false`.
+Categorical answers are arrays of configured options, up to `numberOfVotes` selections; duplicate
+options are accepted only when `duplicateVotingAllowed` is true. Ordinal answers must match one
+configured option. Boolean answers are `true`/`false`.
 Numeric answers must be finite and respect configured inclusive bounds.
 
 ## Default ninja campaign seeding
@@ -176,7 +180,7 @@ The default campaign seeded is:
 - `maxVotesTotal`: 4, `maxVotesPerCategory`: 1, `maxVotesPerCandidate`: 1
 
 **Questions:** Ninja 1–4, each with an image from `/public/mascots/ninja{1-4}.png`, type `text`,
-`allowSuggestions: true`, and `allowVoting: true`.
+`allowSuggestions: true`, `numberOfVotes: 1`, and `duplicateVotingAllowed: false`.
 
 ## Creating a new campaign
 
@@ -196,8 +200,8 @@ New polls can be created by inserting rows directly into Azure Table Storage —
 | maxVotesPerCategory | `1` |
 | maxVotesPerCandidate | `1` |
 
-**Question rows** (`questions` table): add `questionType: text`, `allowSuggestions: true`, and
-`allowVoting: true` to each question.
+**Question rows** (`questions` table): add `questionType: text`, `allowSuggestions: true`,
+`numberOfVotes: 1`, and `duplicateVotingAllowed: false` to each question.
 
 | PartitionKey | RowKey | title | imageUrl | sortOrder |
 |---|---|---|---|---|
@@ -225,9 +229,9 @@ Accessible at: **`/c/ninja-naming`**
 
 **Question row** (`questions` table):
 
-| PartitionKey | RowKey | title | description | questionType | allowSuggestions | allowVoting | imageUrl | sortOrder |
-|---|---|---|---|---|---|---|---|---|
-| `best-padeller-2026` | `nominees` | Who do you nominate? | Suggest and vote for your favourite padeller. | `text` | `true` | `true` | *(empty)* | 1 |
+| PartitionKey | RowKey | title | description | questionType | allowSuggestions | maxSize | numberOfVotes | duplicateVotingAllowed | required | imageUrl | sortOrder |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| `best-padeller-2026` | `nominees` | Who do you nominate? | Suggest and vote for your favourite padeller. | `text` | `true` | `250` | `1` | `false` | `false` | *(empty)* | 1 |
 
 > **Note on imageUrl:** Leave `imageUrl` empty for questions without an image — the card renders gracefully without one. For now, you can point `imageUrl` at existing files in the `/public/mascots/` directory (e.g. `/mascots/ninja1.png`). Image upload and Blob Storage are planned for a future release.
 
@@ -419,9 +423,12 @@ Stores questions (categories) for a campaign. Each row is one question.
 | `description` | string | Short description shown on the question card |
 | `imageUrl` | string | Optional. Path to question image (e.g. `/mascots/ninja1.png`) |
 | `sortOrder` | int | Questions are sorted ascending by this value |
-| `questionType` | string | One of the six supported types described above |
+| `questionType` | string | `categorical`, `boolean`, `ordinal`, `numeric`, or `text` |
+| `required` | bool | Optional; default `false` |
 | `allowSuggestions` | bool | On text questions, whether users may suggest candidates |
-| `allowVoting` | bool | Optional; only valid for text questions |
+| `maxSize` | int | Text only; default `250` |
+| `numberOfVotes` | int | Text only: `0` disables voting; Categorical default is `1` |
+| `duplicateVotingAllowed` | bool | Text/Categorical only; default `false` |
 | `options` | JSON string | JSON-encoded string array required for categorical and ordinal questions |
 | `numericMin`, `numericMax` | number | Optional inclusive numeric-answer bounds |
 | `createdAt` | string | ISO 8601 timestamp |
@@ -495,7 +502,7 @@ Insert into the **campaigns** table:
 | createdAt / updatedAt | ISO timestamp |
 
 Insert into the **questions** table (one row per player), using `questionType: text`,
-`allowSuggestions: false`, and `allowVoting: true` for voting-only questions:
+`allowSuggestions: false`, and `numberOfVotes: 1` for voting-only questions:
 
 | PartitionKey | RowKey | title | sortOrder |
 |---|---|---|---|
@@ -504,8 +511,9 @@ Insert into the **questions** table (one row per player), using `questionType: t
 
 > **Note**: Set the `ninja-naming` campaign `status` to `closed` to hide it from the app once a new active campaign is running.
 
-Configure `allowSuggestions` on each Text question. When false, that question has no suggestion form;
-`allowVoting` can still enable voting on its previously published candidates.
+Configure `allowSuggestions` and `numberOfVotes` on each Text question. When suggestions are closed,
+set `allowSuggestions: false`; voting on previously published candidates can remain enabled by
+setting `numberOfVotes` above zero.
 
 ### Example: "Where should we eat next week?"
 
@@ -524,7 +532,7 @@ Insert into the **campaigns** table:
 | createdAt / updatedAt | ISO timestamp |
 
 Insert into the **questions** table (one row per day or one global "lunch" category), setting
-`questionType: text`, `allowSuggestions: true`, and `allowVoting: true`:
+`questionType: text`, `allowSuggestions: true`, and `numberOfVotes: 1`:
 
 | PartitionKey | RowKey | title | sortOrder |
 |---|---|---|---|

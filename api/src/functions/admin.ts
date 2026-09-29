@@ -75,7 +75,7 @@ import {
   suggestionPartitionKey,
 } from '../tableClient'
 import { escapeODataString } from '../odata'
-import { getCampaign, getQuestionConfig } from '../campaigns'
+import { getCampaign } from '../campaigns'
 
 type ExportFormat = 'json' | 'csv'
 

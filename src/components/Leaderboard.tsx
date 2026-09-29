@@ -1,8 +1,7 @@
-import type { Campaign, Question, Suggestion } from '../types'
+import type { Question, Suggestion } from '../types'
 import { handleImageError } from '../utils/imageError'
 
 interface LeaderboardProps {
-  campaign: Campaign
   questions: Question[]
   suggestions: Suggestion[]
   voteCountById: Map<string, number>
@@ -19,7 +18,6 @@ export function Leaderboard({
   isVoteDisabled,
 }: LeaderboardProps) {
   const ranked = [...suggestions].sort((a, b) => b.votes - a.votes || a.createdAt.localeCompare(b.createdAt))
-  const usesSingleVoteButton = campaign.maxVotesPerCandidate === 1
   const showQuestionImages = questions.length > 1
 
   if (ranked.length === 0) {
@@ -49,6 +47,7 @@ export function Leaderboard({
         <ol className="leaderboard__list">
           {ranked.map((suggestion, index) => {
             const question = questionById[suggestion.questionId]
+            const usesSingleVoteButton = !question?.duplicateVotingAllowed
             const userVoteCount = voteCountById.get(suggestion.id) ?? 0
             const hasVotes = userVoteCount > 0
             const isDisabled = Boolean(isVoteDisabled?.(suggestion.id))

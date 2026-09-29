@@ -45,7 +45,7 @@ export async function fetchQuestionResponses(campaignId: string): Promise<Questi
 export async function postQuestionResponse(
   campaignId: string,
   questionId: string,
-  answer: QuestionResponse['answer'],
+  answer: QuestionResponse['answer'] | undefined,
   sessionId: string,
 ): Promise<void> {
   await apiFetch('/responses', {
