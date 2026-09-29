@@ -160,7 +160,10 @@ function App({ campaignId }: AppProps) {
       })
   }
 
-  const handleQuestionResponseSubmit = async (question: Question, answer: QuestionResponse['answer']): Promise<boolean> => {
+  const handleQuestionResponseSubmit = async (
+    question: Question,
+    answer: QuestionResponse['answer'] | undefined,
+  ): Promise<boolean> => {
     if (!campaign) return false
     try {
       await postQuestionResponse(campaign.id, question.id, answer, getSessionId())

@@ -48,7 +48,6 @@ describe('question image display', () => {
     const question = createQuestion('question-1')
     const { container } = render(
       <SuggestionBoard
-        campaign={campaign}
         questions={[question]}
         suggestions={[createSuggestion(question.id)]}
         voteCountById={new Map()}
@@ -64,7 +63,6 @@ describe('question image display', () => {
     const secondQuestion = createQuestion('question-2')
     const { container } = render(
       <SuggestionBoard
-        campaign={campaign}
         questions={[firstQuestion, secondQuestion]}
         suggestions={[createSuggestion(firstQuestion.id), createSuggestion(secondQuestion.id)]}
         voteCountById={new Map()}
@@ -79,7 +77,6 @@ describe('question image display', () => {
     const question = createQuestion('question-1')
     const { container } = render(
       <Leaderboard
-        campaign={campaign}
         questions={[question]}
         suggestions={[createSuggestion(question.id)]}
         voteCountById={new Map()}
@@ -96,7 +93,6 @@ describe('question image display', () => {
     const secondQuestion = createQuestion('question-2')
     const { container } = render(
       <Leaderboard
-        campaign={campaign}
         questions={[firstQuestion, secondQuestion]}
         suggestions={[createSuggestion(firstQuestion.id), createSuggestion(secondQuestion.id)]}
         voteCountById={new Map()}

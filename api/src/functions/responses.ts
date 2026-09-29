@@ -1,4 +1,5 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions'
+import { RestError } from '@azure/data-tables'
 import { ensureTableExists, getQuestionResponsesClient, type QuestionResponseEntity } from '../tableClient'
 import { escapeODataString } from '../odata'
 import { getQuestionConfig } from '../campaigns'
@@ -82,8 +83,10 @@ async function postResponse(request: HttpRequest, _context: InvocationContext): 
   if (unanswered) {
     try {
       await client.deleteEntity(responsePartitionKey(campaignId, questionId), sessionId)
-    } catch {
-      // No prior answer exists to clear.
+    } catch (error) {
+      if (!(error instanceof RestError) || error.statusCode !== 404) {
+        throw error
+      }
     }
     return { status: 200, jsonBody: { success: true } }
   }

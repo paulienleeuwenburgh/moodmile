@@ -88,7 +88,6 @@ export function SuggestionForm({
           value={suggestion}
           onChange={(event) => handleChange(event.target.value)}
           placeholder="e.g. Sunny Stride"
-          maxLength={maxSize}
           required={selectedQuestion?.required}
           aria-describedby={describedBy}
           aria-invalid={!!validationError}

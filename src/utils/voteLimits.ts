@@ -26,9 +26,9 @@ export function canCastVote(
   suggestionId: string,
   question?: Question,
 ): boolean {
-  const numberOfVotes = question?.numberOfVotes ?? 0
-  const duplicateVotingAllowed = question?.duplicateVotingAllowed ?? false
-  if (numberOfVotes <= 0) {
+  const numberOfVotes = question?.numberOfVotes ?? Number.POSITIVE_INFINITY
+  const duplicateVotingAllowed = question?.duplicateVotingAllowed ?? true
+  if (question && numberOfVotes <= 0) {
     return false
   }
 

@@ -6,7 +6,7 @@ MoodMile is a generic polling app built with React + TypeScript. Campaigns and q
 
 - Responsive, colorful UI for desktop and mobile
 - Question cards with responsive image, title, and description
-- Per-question forms for single-choice, multiple-choice, boolean, ordinal, numeric, and text questions
+- Per-question forms for configurable categorical, boolean, ordinal, numeric, and text questions
 - Text suggestions can optionally be voted on
 - Structured responses are aggregated per answer; each browser can update its answer
 - Multiple submissions supported
@@ -425,9 +425,9 @@ Stores questions (categories) for a campaign. Each row is one question.
 | `sortOrder` | int | Questions are sorted ascending by this value |
 | `questionType` | string | `categorical`, `boolean`, `ordinal`, `numeric`, or `text` |
 | `required` | bool | Optional; default `false` |
-| `allowSuggestions` | bool | On text questions, whether users may suggest candidates |
+| `allowSuggestions` | bool | Text only; whether users may suggest candidates |
 | `maxSize` | int | Text only; default `250` |
-| `numberOfVotes` | int | Text only: `0` disables voting; Categorical default is `1` |
+| `numberOfVotes` | int | Text: `0` disables voting (default `0`). Categorical: maximum selections (default `1`) |
 | `duplicateVotingAllowed` | bool | Text/Categorical only; default `false` |
 | `options` | JSON string | JSON-encoded string array required for categorical and ordinal questions |
 | `numericMin`, `numericMax` | number | Optional inclusive numeric-answer bounds |

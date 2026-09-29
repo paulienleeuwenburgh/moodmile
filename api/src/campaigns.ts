@@ -3,6 +3,7 @@ import {
   getCampaignsClient,
   ensureTableExists,
   entityToCampaignConfig,
+  type CampaignEntity,
   entityToQuestion,
   getQuestionsClient,
   type QuestionEntity,

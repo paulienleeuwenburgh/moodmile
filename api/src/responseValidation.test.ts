@@ -46,6 +46,8 @@ describe('typed question validation', () => {
       .toContain('numberOfVotes must be a non-negative integer.')
     expect(validateQuestion({ ...base, questionType: 'categorical', numberOfVotes: 0, options: ['Red', 'Blue'] }))
       .toContain('numberOfVotes must be a positive integer for categorical questions.')
+    expect(validateQuestion({ ...base, questionType: 'boolean', allowSuggestions: true }))
+      .toContain('allowSuggestions is only supported for text questions.')
   })
 })
 

@@ -94,6 +94,8 @@ export function validateQuestion(question: Partial<QuestionConfig>): string[] {
   }
   if (typeof question.allowSuggestions !== 'boolean') {
     errors.push('allowSuggestions must be a boolean.')
+  } else if (question.questionType !== 'text' && question.allowSuggestions) {
+    errors.push('allowSuggestions is only supported for text questions.')
   }
 
   return errors

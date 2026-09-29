@@ -24,6 +24,11 @@ describe('validateSuggestion', () => {
     )
   })
 
+  it('enforces a question-specific maximum length', () => {
+    expect(validateSuggestion('12345', 4)).toBe('Answers can be up to 4 characters long.')
+    expect(validateSuggestion('1234', 4)).toBe('')
+  })
+
   it('rejects script injection attempts', () => {
     expect(validateSuggestion('<script>alert("xss")</script>')).toBe(
       'Answers can include punctuation, quotation marks, emoji, and accented letters, but not angle brackets.',

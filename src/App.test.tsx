@@ -18,7 +18,7 @@ const mockFetchQuestions = vi.fn<(campaignId: string) => Promise<Question[]>>()
 const mockFetchSuggestions = vi.fn<(campaignId: string) => Promise<Suggestion[]>>()
 const mockFetchVoteCounts = vi.fn<(campaignId: string, sessionId: string) => Promise<Map<string, number>>>()
 const mockFetchQuestionResponses = vi.fn<(campaignId: string) => Promise<QuestionResponse[]>>()
-const mockPostQuestionResponse = vi.fn<(campaignId: string, questionId: string, answer: QuestionResponse['answer'], sessionId: string) => Promise<void>>()
+const mockPostQuestionResponse = vi.fn<(campaignId: string, questionId: string, answer: QuestionResponse['answer'] | undefined, sessionId: string) => Promise<void>>()
 const mockPostSuggestion = vi.fn<
   (campaignId: string, questionId: string, name: string, sessionId: string) => Promise<Suggestion | null>
 >()
@@ -113,6 +113,7 @@ function setupApi(
     suggestions.push(created)
     return created
   })
+
   mockPostVote.mockImplementation(async (_campaignId, _questionId, suggestionId, _sessionId, revoke) => {
     const idx = suggestions.findIndex((s) => s.id === suggestionId)
     if (idx === -1) return null
@@ -438,13 +439,15 @@ describe('input validation', () => {
     expect(screen.getByText('244 characters left')).toBeInTheDocument()
   })
 
-  it('shows an error and does not submit when the answer exceeds 250 characters', async () => {
-    setupApi()
+  it('shows an error and does not submit when the answer exceeds the question maxSize', async () => {
+    const question = { ...ninjaQuestions[0], maxSize: 4 }
+    setupApi([], [], ninjaCampaign, [question])
     render(<App campaignId="ninja-naming" />)
-    await typeInSuggestion('a'.repeat(251))
+    const input = await screen.findByRole('textbox', { name: /your answer/i })
+    fireEvent.change(input, { target: { value: 'abcde' } })
     expect(screen.getByText('1 character over limit')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: /submit/i }))
-    expect(screen.getByRole('alert')).toHaveTextContent('Answers can be up to 250 characters long.')
+    expect(screen.getByRole('alert')).toHaveTextContent('Answers can be up to 4 characters long.')
     expect(getSuggestionNames()).toHaveLength(0)
   })
 
@@ -793,6 +796,12 @@ describe('stale data refresh UX', () => {
 // ---------------------------------------------------------------------------
 
 describe('vote budget after soft delete', () => {
+  const multiVoteNinjaQuestions = ninjaQuestions.map((question) => ({
+    ...question,
+    numberOfVotes: 3,
+    duplicateVotingAllowed: true,
+  }))
+
   it('soft-deleted candidates release their votes back to the voter budget', async () => {
     // Campaign allows 3 total votes, up to 2 per candidate.
     const multiVoteCampaign: Campaign = {
@@ -811,7 +820,7 @@ describe('vote budget after soft delete', () => {
     }
     const voteCounts = new Map<string, number>([['rogier', 1]])
     mockFetchCampaign.mockResolvedValue(multiVoteCampaign)
-    mockFetchQuestions.mockResolvedValue(ninjaQuestions)
+    mockFetchQuestions.mockResolvedValue(multiVoteNinjaQuestions)
     mockFetchSuggestions.mockResolvedValue([rogier])
     mockFetchVoteCounts.mockResolvedValue(voteCounts)
 
@@ -853,7 +862,7 @@ describe('vote budget after soft delete', () => {
       ['rogier', 1],
     ])
     mockFetchCampaign.mockResolvedValue(multiVoteCampaign)
-    mockFetchQuestions.mockResolvedValue(ninjaQuestions)
+    mockFetchQuestions.mockResolvedValue(multiVoteNinjaQuestions)
     mockFetchSuggestions.mockResolvedValue([marja, rogier])
     mockFetchVoteCounts.mockResolvedValue(voteCounts)
 
@@ -884,7 +893,7 @@ describe('vote budget after soft delete', () => {
     // Marta had 0 votes and was deleted — voteCountById has no entry for her.
     const voteCounts = new Map<string, number>([['rogier', 1]])
     mockFetchCampaign.mockResolvedValue(multiVoteCampaign)
-    mockFetchQuestions.mockResolvedValue(ninjaQuestions)
+    mockFetchQuestions.mockResolvedValue(multiVoteNinjaQuestions)
     mockFetchSuggestions.mockResolvedValue([rogier])
     mockFetchVoteCounts.mockResolvedValue(voteCounts)
 
@@ -1182,10 +1191,61 @@ describe('typed questions', () => {
       expect(mockPostQuestionResponse).toHaveBeenCalledWith(
         'ninja-naming',
         'color',
-        'Blue',
+        ['Blue'],
         expect.stringMatching(/^[0-9a-f-]{36}$/i),
       ),
     )
+  })
+
+  it('allows an optional categorical question to be submitted unanswered', async () => {
+    const question: Question = {
+      id: 'color',
+      campaignId: 'ninja-naming',
+      title: 'Favorite color?',
+      description: '',
+      sortOrder: 1,
+      questionType: 'categorical',
+      allowSuggestions: false,
+      options: ['Red', 'Blue'],
+    }
+    setupApi([], [], ninjaCampaign, [question])
+    render(<App campaignId="ninja-naming" />)
+
+    await userEvent.click(await screen.findByRole('button', { name: /submit answer/i }))
+    await waitFor(() => expect(mockPostQuestionResponse).toHaveBeenCalledWith(
+      'ninja-naming',
+      'color',
+      undefined,
+      expect.stringMatching(/^[0-9a-f-]{36}$/i),
+    ))
+  })
+
+  it('supports multiple categorical votes and repeated choices when configured', async () => {
+    const question: Question = {
+      id: 'color',
+      campaignId: 'ninja-naming',
+      title: 'Favorite color?',
+      description: '',
+      sortOrder: 1,
+      questionType: 'categorical',
+      allowSuggestions: false,
+      numberOfVotes: 3,
+      duplicateVotingAllowed: true,
+      options: ['Red', 'Blue'],
+    }
+    setupApi([], [], ninjaCampaign, [question])
+    render(<App campaignId="ninja-naming" />)
+
+    const redVotes = await screen.findByRole('spinbutton', { name: /red votes/i })
+    fireEvent.change(redVotes, { target: { value: '2' } })
+    await userEvent.click(screen.getByRole('button', { name: /submit answer/i }))
+
+    await waitFor(() => expect(mockPostQuestionResponse).toHaveBeenCalledWith(
+      'ninja-naming',
+      'color',
+      ['Red', 'Red'],
+      expect.stringMatching(/^[0-9a-f-]{36}$/i),
+    ))
   })
 
   it('does not show voting controls for text questions with voting disabled', async () => {
@@ -1253,7 +1313,7 @@ describe('maxVotesPerCandidate', () => {
   }
 
   const multiVoteQuestions: Question[] = [
-    { id: 'nominees', campaignId: 'best-padeller-2026', title: 'Nominees', description: 'desc', sortOrder: 1, questionType: 'text', allowSuggestions: true, numberOfVotes: 1, duplicateVotingAllowed: false },
+    { id: 'nominees', campaignId: 'best-padeller-2026', title: 'Nominees', description: 'desc', sortOrder: 1, questionType: 'text', allowSuggestions: true, numberOfVotes: 3, duplicateVotingAllowed: true },
   ]
 
   const alice: Suggestion = {

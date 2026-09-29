@@ -10,7 +10,6 @@ interface LeaderboardProps {
 }
 
 export function Leaderboard({
-  campaign,
   questions,
   suggestions,
   voteCountById,

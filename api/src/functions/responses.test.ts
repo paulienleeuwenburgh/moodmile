@@ -85,6 +85,43 @@ describe('typed response API', () => {
     expect(mockUpsertEntity).not.toHaveBeenCalled()
   })
 
+  it('clears an existing answer when an optional question is submitted unanswered', async () => {
+    mockGetQuestionConfig.mockResolvedValue({
+      questionType: 'boolean',
+      allowSuggestions: false,
+      required: false,
+    })
+    const sessionId = '00000000-0000-4000-8000-000000000001'
+    const response = await postHandler(
+      request({ campaignId: 'campaign-1', questionId: 'q1', sessionId }),
+      {},
+    )
+
+    expect(response.status).toBe(200)
+    expect(mockDeleteEntity).toHaveBeenCalledWith('campaign-1|q1', sessionId)
+    expect(mockUpsertEntity).not.toHaveBeenCalled()
+  })
+
+  it('rejects an unanswered required question', async () => {
+    mockGetQuestionConfig.mockResolvedValue({
+      questionType: 'boolean',
+      allowSuggestions: false,
+      required: true,
+    })
+    const response = await postHandler(
+      request({
+        campaignId: 'campaign-1',
+        questionId: 'q1',
+        sessionId: '00000000-0000-4000-8000-000000000001',
+      }),
+      {},
+    )
+
+    expect(response.status).toBe(400)
+    expect(mockDeleteEntity).not.toHaveBeenCalled()
+    expect(mockUpsertEntity).not.toHaveBeenCalled()
+  })
+
   it('requires valid session IDs and routes text suggestions to the suggestions API', async () => {
     mockGetQuestionConfig.mockResolvedValue({
       questionType: 'text',

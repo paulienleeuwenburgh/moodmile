@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Campaign, Suggestion } from '../types'
 import { canCastVote, getClientVoteRecords, getRemainingVotesTotal } from './voteLimits'
+import type { Question } from '../types'
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -33,6 +34,17 @@ const rogier: Suggestion = {
   name: 'Rogier',
   createdAt: '2024-01-02T00:00:00.000Z',
   votes: 1,
+}
+const voteQuestion: Question = {
+  id: 'q-1',
+  campaignId: 'test-campaign',
+  title: 'Question',
+  description: '',
+  questionType: 'text',
+  allowSuggestions: true,
+  numberOfVotes: 5,
+  duplicateVotingAllowed: true,
+  sortOrder: 1,
 }
 
 // ---------------------------------------------------------------------------
@@ -139,7 +151,7 @@ describe('canCastVote – total limit', () => {
   it('allows a vote when total budget is not exhausted', () => {
     const counts = new Map([['rogier', 1]])
     const records = getClientVoteRecords([rogier], counts)
-    expect(canCastVote(baseCampaign, records, 'q-1', 'rogier')).toBe(true)
+    expect(canCastVote(baseCampaign, records, 'q-1', 'rogier', voteQuestion)).toBe(true)
   })
 
   it('blocks a vote when total budget is exhausted by votes for active candidates', () => {
@@ -148,7 +160,23 @@ describe('canCastVote – total limit', () => {
       ['marja', 1],
     ])
     const records = getClientVoteRecords([rogier, marja], counts)
-    expect(canCastVote(baseCampaign, records, 'q-1', 'rogier')).toBe(false)
+    expect(canCastVote(baseCampaign, records, 'q-1', 'rogier', voteQuestion)).toBe(false)
+  })
+
+  it('enforces the question vote budget and candidate duplicate setting', () => {
+    const alreadyVoted = [{ questionId: 'q-1', suggestionId: 'rogier' }]
+    expect(canCastVote(baseCampaign, alreadyVoted, 'q-1', 'rogier', {
+      ...voteQuestion,
+      numberOfVotes: 3,
+      duplicateVotingAllowed: false,
+    })).toBe(false)
+    expect(canCastVote(baseCampaign, [
+      ...alreadyVoted,
+      { questionId: 'q-1', suggestionId: 'marja' },
+    ], 'q-1', 'new', {
+      ...voteQuestion,
+      numberOfVotes: 2,
+    })).toBe(false)
   })
 
   it('allows a vote when deleted candidates have released their preserved votes', () => {
@@ -157,7 +185,7 @@ describe('canCastVote – total limit', () => {
       ['rogier', 1],
     ])
     const records = getClientVoteRecords([rogier], counts)
-    expect(canCastVote(baseCampaign, records, 'q-1', 'rogier')).toBe(true)
+    expect(canCastVote(baseCampaign, records, 'q-1', 'rogier', voteQuestion)).toBe(true)
   })
 
   it('blocks a vote again after the deleted candidate is restored', () => {
@@ -166,6 +194,6 @@ describe('canCastVote – total limit', () => {
       ['rogier', 1],
     ])
     const records = getClientVoteRecords([marja, rogier], counts)
-    expect(canCastVote(baseCampaign, records, 'q-1', 'rogier')).toBe(false)
+    expect(canCastVote(baseCampaign, records, 'q-1', 'rogier', voteQuestion)).toBe(false)
   })
 })

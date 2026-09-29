@@ -44,11 +44,15 @@ vi.mock('./tableClient', () => ({
     imageUrl: entity.imageUrl,
     sortOrder: entity.sortOrder,
     questionType: entity.questionType,
-    allowSuggestions: entity.allowSuggestions,
-    required: entity.required,
-    maxSize: entity.maxSize,
-    numberOfVotes: entity.numberOfVotes,
-    duplicateVotingAllowed: entity.duplicateVotingAllowed,
+    allowSuggestions: entity.questionType === 'text' ? entity.allowSuggestions ?? true : false,
+    required: entity.required ?? false,
+    maxSize: entity.questionType === 'text' ? entity.maxSize ?? 250 : undefined,
+    numberOfVotes: entity.questionType === 'text' ? entity.numberOfVotes ?? 0
+      : entity.questionType === 'categorical' ? entity.numberOfVotes ?? 1
+        : undefined,
+    duplicateVotingAllowed: entity.questionType === 'text' || entity.questionType === 'categorical'
+      ? entity.duplicateVotingAllowed ?? false
+      : undefined,
     options: entity.options,
     createdAt: entity.createdAt,
     updatedAt: entity.updatedAt,
@@ -119,6 +123,8 @@ describe('admin campaign export', () => {
           allowSuggestions: true,
           numberOfVotes: 1,
           duplicateVotingAllowed: false,
+          maxSize: 125,
+          required: true,
           createdAt: '2026-01-02T00:00:00.000Z',
           updatedAt: '2026-01-02T00:00:00.000Z',
         },
@@ -212,7 +218,7 @@ describe('admin campaign export', () => {
     const payload = JSON.parse(String(response.body)) as {
       campaign: { id: string; title: string }
       summary: { uniqueSubmissionDevices: number; uniqueVotingDevices: number }
-      questions: Array<{ id: string }>
+      questions: Array<{ id: string; required: boolean; maxSize: number; numberOfVotes: number; duplicateVotingAllowed: boolean }>
       submissions: Array<{ id: string; questionTitle: string; isDeleted: boolean; deletedBy?: string; sessionId: string }>
       responses: Array<{ questionId: string; questionType: string; answer: unknown; sessionId: string }>
       votes: Array<{ sessionId: string; suggestionName: string; isDeletedSuggestion: boolean }>
@@ -223,6 +229,13 @@ describe('admin campaign export', () => {
       title: 'Best Padeller 2026',
     })
     expect(payload.questions.map((question) => question.id)).toEqual(['q-1', 'q-2'])
+    expect(payload.questions[0]).toMatchObject({
+      required: false,
+      maxSize: 250,
+      numberOfVotes: 1,
+      duplicateVotingAllowed: false,
+    })
+    expect(payload.questions[1]).toMatchObject({ required: true, maxSize: 125 })
     expect(payload.summary).toEqual({
       uniqueSubmissionDevices: 3,
       uniqueVotingDevices: 2,

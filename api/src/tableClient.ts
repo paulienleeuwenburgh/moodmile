@@ -97,7 +97,7 @@ export interface QuestionEntity {
   rowKey: string       // questionId
   title: string
   description: string
-  questionType?: QuestionType
+  questionType: QuestionType
   allowSuggestions?: boolean
   required?: boolean
   maxSize?: number
@@ -136,7 +136,7 @@ export function entityToCampaignConfig(entity: TableEntityResult<CampaignEntity>
 }
 
 export function entityToQuestion(entity: TableEntityResult<QuestionEntity>) {
-  const questionType = entity.questionType ?? 'text'
+  const questionType = entity.questionType
   let options: string[] | undefined
   if (typeof entity.options === 'string') {
     try {
@@ -154,7 +154,7 @@ export function entityToQuestion(entity: TableEntityResult<QuestionEntity>) {
     title: entity.title,
     description: entity.description,
     questionType,
-    allowSuggestions: entity.allowSuggestions ?? true,
+    allowSuggestions: questionType === 'text' ? entity.allowSuggestions ?? true : false,
     required: entity.required ?? false,
     maxSize: questionType === 'text' ? entity.maxSize ?? 250 : undefined,
     numberOfVotes: questionType === 'text' ? entity.numberOfVotes ?? 0

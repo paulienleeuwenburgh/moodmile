@@ -79,6 +79,12 @@ export function QuestionResponseForm({ question, onSubmit }: QuestionResponseFor
       {question.questionType === 'categorical' || question.questionType === 'ordinal' ? (
         <fieldset>
           <legend>{question.title}{question.required ? ' (required)' : ''}</legend>
+          {question.questionType === 'categorical' && (question.numberOfVotes ?? 1) > 1 && (
+            <p>
+              Select up to {question.numberOfVotes ?? 1} options
+              {question.duplicateVotingAllowed ? ', including repeated choices.' : '.'}
+            </p>
+          )}
           {question.options?.map((option) => (
             <label key={option}>
               {question.questionType === 'categorical' &&
@@ -181,7 +187,6 @@ export function QuestionResponseForm({ question, onSubmit }: QuestionResponseFor
           <input
             id={`answer-${question.id}`}
             value={textValue}
-            maxLength={question.maxSize ?? 250}
             required={question.required}
             onChange={(event) => setTextValue(event.target.value)}
           />
