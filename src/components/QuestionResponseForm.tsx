@@ -80,75 +80,73 @@ export function QuestionResponseForm({ question, onSubmit }: QuestionResponseFor
         <fieldset>
           <legend>{question.title}{question.required ? ' (required)' : ''}</legend>
           {question.questionType === 'categorical' && (question.numberOfVotes ?? 1) > 1 && (
-            <p>
-              Select up to {question.numberOfVotes ?? 1} options
-              {question.duplicateVotingAllowed ? ', including repeated choices.' : '.'}
+            <p className="question-response__instructions">
+              Submit {question.numberOfVotes} votes
+              {question.duplicateVotingAllowed ? ', multiple votes per answer allowed' : ''}
             </p>
           )}
-          {question.options?.map((option) => (
-            <label key={option}>
-              {question.questionType === 'categorical' &&
-              (question.numberOfVotes ?? 1) > 1 &&
-              question.duplicateVotingAllowed ? (
-                option
-              ) : (
-                <>
-                  <input
-                    type={question.questionType === 'ordinal' || (question.numberOfVotes ?? 1) === 1 ? 'radio' : 'checkbox'}
-                    name={`answer-${question.id}`}
-                    value={option}
-                    checked={selected.includes(option)}
-                    disabled={
-                      question.questionType === 'categorical' &&
-                      (question.numberOfVotes ?? 1) > 1 &&
-                      !selected.includes(option) &&
-                      selected.length >= (question.numberOfVotes ?? 1)
-                    }
-                    onChange={(event) => {
-                      if (question.questionType === 'ordinal' || (question.numberOfVotes ?? 1) === 1) {
-                        setSelected([option])
-                      } else if (event.target.checked) {
-                        setSelected((current) => [...current, option])
-                      } else {
-                        setSelected((current) => current.filter((value) => value !== option))
+          <ul className="question-response__options">
+            {question.options?.map((option) => {
+              const allowsRepeatedVotes =
+                question.questionType === 'categorical' &&
+                (question.numberOfVotes ?? 1) > 1 &&
+                question.duplicateVotingAllowed
+              if (allowsRepeatedVotes) {
+                const quantity = selected.filter((value) => value === option).length
+                const maxQuantity = (question.numberOfVotes ?? 1) - selected.length + quantity
+                return (
+                  <li key={option} className="question-response__option question-response__option--votes">
+                    <span>{option}</span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={maxQuantity}
+                      value={quantity}
+                      aria-label={`${option} votes`}
+                      onChange={(event) => {
+                        const nextQuantity = Math.max(0, Number(event.target.value) || 0)
+                        setSelected((current) => [
+                          ...current.filter((value) => value !== option),
+                          ...Array.from(
+                            { length: Math.min(nextQuantity, (question.numberOfVotes ?? 1) - current.length + current.filter((value) => value === option).length) },
+                            () => option,
+                          ),
+                        ])
+                      }}
+                    />
+                  </li>
+                )
+              }
+              return (
+                <li key={option} className="question-response__option">
+                  <label>
+                    <input
+                      type={question.questionType === 'ordinal' || (question.numberOfVotes ?? 1) === 1 ? 'radio' : 'checkbox'}
+                      name={`answer-${question.id}`}
+                      value={option}
+                      checked={selected.includes(option)}
+                      disabled={
+                        question.questionType === 'categorical' &&
+                        (question.numberOfVotes ?? 1) > 1 &&
+                        !selected.includes(option) &&
+                        selected.length >= (question.numberOfVotes ?? 1)
                       }
-                    }}
-                  />
-                  {option}
-                </>
-              )}
-            </label>
-          ))}
-          {question.questionType === 'categorical' &&
-            (question.numberOfVotes ?? 1) > 1 &&
-            question.duplicateVotingAllowed && (
-              <div className="suggestion-form__row">
-                {question.options?.map((option) => {
-                  const quantity = selected.filter((value) => value === option).length
-                  return (
-                    <label key={`votes-${option}`}>
-                      {option} votes
-                      <input
-                        type="number"
-                        min={0}
-                        max={(question.numberOfVotes ?? 1) - selected.length + quantity}
-                        value={quantity}
-                        onChange={(event) => {
-                          const nextQuantity = Math.max(0, Number(event.target.value) || 0)
-                          setSelected((current) => [
-                            ...current.filter((value) => value !== option),
-                            ...Array.from(
-                              { length: Math.min(nextQuantity, (question.numberOfVotes ?? 1) - current.length + current.filter((value) => value === option).length) },
-                              () => option,
-                            ),
-                          ])
-                        }}
-                      />
-                    </label>
-                  )
-                })}
-              </div>
-            )}
+                      onChange={(event) => {
+                        if (question.questionType === 'ordinal' || (question.numberOfVotes ?? 1) === 1) {
+                          setSelected([option])
+                        } else if (event.target.checked) {
+                          setSelected((current) => [...current, option])
+                        } else {
+                          setSelected((current) => current.filter((value) => value !== option))
+                        }
+                      }}
+                    />
+                    {option}
+                  </label>
+                </li>
+              )
+            })}
+          </ul>
         </fieldset>
       ) : null}
       {question.questionType === 'boolean' && (

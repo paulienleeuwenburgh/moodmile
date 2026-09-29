@@ -1184,6 +1184,8 @@ describe('typed questions', () => {
     setupApi([], [], ninjaCampaign, [question])
     render(<App campaignId="ninja-naming" />)
 
+    await screen.findByRole('radio', { name: 'Blue' })
+    expect(document.querySelector('.question-card__image-wrap')).not.toBeInTheDocument()
     await userEvent.click(await screen.findByRole('radio', { name: 'Blue' }))
     await userEvent.click(screen.getByRole('button', { name: /submit answer/i }))
 
@@ -1237,6 +1239,10 @@ describe('typed questions', () => {
     render(<App campaignId="ninja-naming" />)
 
     const redVotes = await screen.findByRole('spinbutton', { name: /red votes/i })
+    expect(screen.getByText('Submit 3 votes, multiple votes per answer allowed')).toBeInTheDocument()
+    const options = document.querySelector('.question-response__options')
+    expect(options?.querySelectorAll('li')).toHaveLength(2)
+    expect(options?.querySelector('.question-response__option--votes input')).toBe(redVotes)
     fireEvent.change(redVotes, { target: { value: '2' } })
     await userEvent.click(screen.getByRole('button', { name: /submit answer/i }))
 

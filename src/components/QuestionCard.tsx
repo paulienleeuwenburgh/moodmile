@@ -20,6 +20,7 @@ export function QuestionCard({ question, isSelected, onSelect, hideTitle = false
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [imageVariant, setImageVariant] = useState<'landscape' | 'portrait' | 'square'>('landscape')
   const shouldShowTitle = !hideTitle
+  const imageUrl = question.imageUrl?.trim()
   const description = typeof question.description === 'string' ? question.description.trim() : ''
   const shouldShowDescription = description.length > 0
 
@@ -53,11 +54,10 @@ export function QuestionCard({ question, isSelected, onSelect, hideTitle = false
         className={`question-card${isSelected ? ' question-card--selected' : ''}`}
         aria-label={question.title}
       >
-        <div className={`question-card__image-wrap question-card__image-wrap--${imageVariant}`}>
-          {question.imageUrl ? (
-            <>
+        {imageUrl && (
+          <div className={`question-card__image-wrap question-card__image-wrap--${imageVariant}`}>
               <img
-                src={question.imageUrl}
+                src={imageUrl}
                 alt={question.title}
                 className={`question-card__image question-card__image--${imageVariant}`}
                 onClick={() => setLightboxOpen(true)}
@@ -67,9 +67,8 @@ export function QuestionCard({ question, isSelected, onSelect, hideTitle = false
                   handleImageError(event)
                 }}
               />
-            </>
-          ) : null}
-        </div>
+          </div>
+        )}
         <button
           type="button"
           className="question-card__select-btn"
@@ -85,9 +84,9 @@ export function QuestionCard({ question, isSelected, onSelect, hideTitle = false
         </button>
       </article>
 
-      {lightboxOpen && question.imageUrl && (
+      {lightboxOpen && imageUrl && (
         <ImageLightbox
-          src={question.imageUrl}
+          src={imageUrl}
           alt={question.title}
           onClose={() => setLightboxOpen(false)}
         />
