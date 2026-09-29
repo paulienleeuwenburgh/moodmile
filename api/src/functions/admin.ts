@@ -52,7 +52,7 @@
  *     Downloads either:
  *       - a JSON export containing campaign metadata, questions, all submissions
  *         (active and deleted), summary metrics, and all vote rows; or
- *       - a CSV export containing all submissions only.
+ *       - a CSV export containing text suggestions and structured responses.
  *
  *   GET /api/mgmt/campaigns/{campaignId}/summary
  *     Returns admin-only campaign summary metrics including unique submission
@@ -75,7 +75,7 @@ import {
   suggestionPartitionKey,
 } from '../tableClient'
 import { escapeODataString } from '../odata'
-import { getCampaign } from '../campaigns'
+import { getCampaign, getQuestionConfig } from '../campaigns'
 
 type ExportFormat = 'json' | 'csv'
 
@@ -326,7 +326,10 @@ async function collectCampaignAdminData(campaignId: string) {
   for await (const entity of questionsClient.listEntities<QuestionEntity>({
     queryOptions: { filter: `PartitionKey eq '${escapeODataString(campaignId)}'` },
   })) {
-    questions.push(entityToQuestion(entity))
+    const legacyQuestion = entity.allowSuggestions === undefined
+      ? await getQuestionConfig(campaignId, String(entity.rowKey))
+      : undefined
+    questions.push(legacyQuestion ?? entityToQuestion(entity))
   }
   questions.sort((a, b) => a.sortOrder - b.sortOrder)
   const questionTitles = new Map(questions.map((question) => [question.id, question.title]))

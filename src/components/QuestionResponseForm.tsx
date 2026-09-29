@@ -4,7 +4,7 @@ import type { Question, QuestionResponse } from '../types'
 
 interface QuestionResponseFormProps {
   question: Question
-  onSubmit: (answer: QuestionResponse['answer']) => void | Promise<void>
+  onSubmit: (answer: QuestionResponse['answer']) => boolean | void | Promise<boolean | void>
 }
 
 export function QuestionResponseForm({ question, onSubmit }: QuestionResponseFormProps) {
@@ -66,7 +66,8 @@ export function QuestionResponseForm({ question, onSubmit }: QuestionResponseFor
     }
 
     setError('')
-    await onSubmit(answer)
+    const submitted = await onSubmit(answer)
+    if (submitted === false) return
     setTextValue('')
     setSelected([])
     setBooleanValue('')
@@ -134,6 +135,7 @@ export function QuestionResponseForm({ question, onSubmit }: QuestionResponseFor
           <input
             id={`answer-${question.id}`}
             type="number"
+            step="any"
             min={question.numericMin}
             max={question.numericMax}
             value={textValue}
@@ -146,7 +148,6 @@ export function QuestionResponseForm({ question, onSubmit }: QuestionResponseFor
           <label htmlFor={`answer-${question.id}`}>{question.title}</label>
           <input
             id={`answer-${question.id}`}
-            maxLength={250}
             value={textValue}
             onChange={(event) => setTextValue(event.target.value)}
           />

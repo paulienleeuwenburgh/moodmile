@@ -152,7 +152,7 @@ function App({ campaignId }: AppProps) {
       .catch((err: unknown) => {
         setSuggestions((current) => current.filter((s) => s.id !== tempId))
         if (err instanceof ApiError && err.status === 403) {
-          setActionError('Suggestions are closed for this campaign.')
+          setActionError('Suggestions are closed for this question.')
           void refreshData()
           return
         }
@@ -160,14 +160,16 @@ function App({ campaignId }: AppProps) {
       })
   }
 
-  const handleQuestionResponseSubmit = async (question: Question, answer: QuestionResponse['answer']) => {
-    if (!campaign) return
+  const handleQuestionResponseSubmit = async (question: Question, answer: QuestionResponse['answer']): Promise<boolean> => {
+    if (!campaign) return false
     try {
       await postQuestionResponse(campaign.id, question.id, answer, getSessionId())
       setQuestionResponses(await fetchQuestionResponses(campaign.id))
       setActionError(null)
+      return true
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Failed to save your answer.')
+      return false
     }
   }
 
@@ -384,7 +386,7 @@ function App({ campaignId }: AppProps) {
 
       {selectedQuestion?.questionType === 'text' && selectedQuestion.allowSuggestions ? (
         <SuggestionForm
-          questions={[selectedQuestion]}
+          questions={suggestionQuestions}
           selectedQuestionId={selectedQuestion.id}
           onQuestionChange={setSelectedQuestionId}
           onSubmitSuggestion={handleSuggestionSubmit}
@@ -397,8 +399,12 @@ function App({ campaignId }: AppProps) {
       ) : null}
       {selectedQuestion?.questionType === 'text' && !selectedQuestion.allowSuggestions && (
         <section className="suggestion-state suggestion-state--closed" aria-label="Suggestions closed">
-          <h2>Suggestions are closed</h2>
-          <p>This question is in voting-only mode. You can still review published candidates and cast votes.</p>
+          <h2>{selectedQuestion.allowVoting ? 'Suggestions are closed' : 'Text responses are closed'}</h2>
+          <p>
+            {selectedQuestion.allowVoting
+              ? 'This question is in voting-only mode. You can still review published candidates and cast votes.'
+              : 'Submissions and voting are closed for this question.'}
+          </p>
         </section>
       )}
 

@@ -58,7 +58,9 @@ export function SuggestionBoard({
                     <path d="M5.5 3L8 1l2.5 2" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
                     <path d="M8 1v5" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
                   </svg>
-                  No suggestions yet — be the first!
+                  {question.allowSuggestions
+                    ? 'No suggestions yet — be the first!'
+                    : 'Suggestions are closed for this question.'}
                 </p>
               ) : (
                 <ul>

@@ -6,7 +6,9 @@ MoodMile is a generic polling app built with React + TypeScript. Campaigns and q
 
 - Responsive, colorful UI for desktop and mobile
 - Question cards with responsive image, title, and description
-- Suggestion form shown only when the active campaign allows submissions
+- Per-question forms for single-choice, multiple-choice, boolean, ordinal, numeric, and text questions
+- Text suggestions can optionally be voted on
+- Structured responses are aggregated per answer; each browser can update its answer
 - Multiple submissions supported
 - Suggestions shown as grouped cards by question
 - Suggestions persisted in **Azure Table Storage** (shared across all users)
@@ -44,7 +46,8 @@ Browser (React + Vite)
                         └──►  Azure Table Storage
                                   ├── campaigns    (campaign configuration)
                                   ├── questions    (questions per campaign)
-                                  ├── suggestions  (mascot name suggestions)
+                                  ├── suggestions  (text suggestions)
+                                  ├── questionResponses (structured answers)
                                   └── votes        (per-session vote tracking)
 ```
 
@@ -62,6 +65,7 @@ the Azure Functions backend. The only thing stored in the browser is an anonymou
 | Table: `campaigns` | Created automatically; seeded with ninja-naming on first request |
 | Table: `questions` | Created automatically; seeded with ninja questions on first request |
 | Table: `suggestions` | Created automatically on first write |
+| Table: `questionResponses` | Created automatically on first response |
 | Table: `votes` | Created automatically on first write |
 | Azure Functions App | Node.js 20+, v4 programming model |
 
@@ -90,7 +94,6 @@ Stores campaign configuration. Each row is one campaign.
 | `title` | string | Displayed as the page heading |
 | `description` | string | Displayed below the heading |
 | `status` | string | `"active"` or `"closed"` |
-| `allowSuggestions` | bool | Whether users can submit new suggestions |
 | `maxVotesTotal` | int | Max votes per session across the whole campaign (0 = unlimited) |
 | `maxVotesPerCategory` | int | Max votes per session within one question (0 = unlimited) |
 | `maxVotesPerCandidate` | int | Max votes per session for a single suggestion (0 = unlimited) |
@@ -109,6 +112,11 @@ Stores questions (categories) for a campaign. Each row is one question.
 | `description` | string | Short description shown on the question card |
 | `imageUrl` | string | Optional. Path to question image (e.g. `/mascots/ninja1.png`). Leave empty for no image — the card renders gracefully without one. Use a `16:9` landscape image where possible for the most consistent preview. |
 | `sortOrder` | int | Questions are sorted ascending by this value |
+| `questionType` | string | `categorical-single`, `categorical-multiple`, `boolean`, `ordinal`, `numeric`, or `text` |
+| `allowSuggestions` | bool | On text questions, whether users may suggest text candidates |
+| `allowVoting` | bool | Optional; only valid for text questions. Enables votes for text suggestions |
+| `options` | JSON string | JSON-encoded string array required for categorical and ordinal questions; ordinal order is preserved |
+| `numericMin`, `numericMax` | number | Optional inclusive bounds for numeric answers |
 | `createdAt` | string | ISO 8601 timestamp |
 | `updatedAt` | string | ISO 8601 timestamp |
 
@@ -138,6 +146,23 @@ Tracks which suggestions each browser session has voted for.
 | `suggestionId` | string | The suggestion that was voted for |
 | `createdAt` | string | ISO 8601 timestamp |
 
+### `questionResponses` table
+
+Stores one replaceable answer per browser session and structured question. Text questions use
+the `suggestions` table instead; their submitted text can be voted on only when `allowVoting`
+is enabled on that question.
+
+| Property | Type | Notes |
+|---|---|---|
+| `PartitionKey` | string | `"{campaignId}\|{questionId}"` |
+| `RowKey` | string | Browser session UUID |
+| `answer` | string | JSON-serialized string, string array, boolean, or number |
+| `createdAt` | string | ISO 8601 timestamp |
+
+Categorical single-choice and ordinal answers must match an option; multiple-choice answers
+must contain one or more unique configured options. Boolean answers are `true`/`false`.
+Numeric answers must be finite and respect configured inclusive bounds.
+
 ## Default ninja campaign seeding
 
 On every request to `GET /api/campaign?campaignId=X`, the backend calls `seedDefaultCampaign()` which checks whether the `ninja-naming` campaign exists and creates it if it does not. This ensures the default campaign is always available regardless of which campaign URL is requested first. The seed function is idempotent (uses `upsertEntity` with Replace mode), so concurrent cold-starts are safe.
@@ -147,10 +172,11 @@ The default campaign seeded is:
 **Campaign:**
 - `campaignId`: `ninja-naming`
 - `title`: These four ninjas need names
-- `status`: active, `allowSuggestions`: true
+- `status`: active
 - `maxVotesTotal`: 4, `maxVotesPerCategory`: 1, `maxVotesPerCandidate`: 1
 
-**Questions:** Ninja 1–4, each with an image from `/public/mascots/ninja{1-4}.png`
+**Questions:** Ninja 1–4, each with an image from `/public/mascots/ninja{1-4}.png`, type `text`,
+`allowSuggestions: true`, and `allowVoting: true`.
 
 ## Creating a new campaign
 
@@ -166,12 +192,12 @@ New polls can be created by inserting rows directly into Azure Table Storage —
 | RowKey | `ninja-naming` |
 | title | `These four ninjas need names` |
 | status | `active` |
-| allowSuggestions | `true` |
 | maxVotesTotal | `4` |
 | maxVotesPerCategory | `1` |
 | maxVotesPerCandidate | `1` |
 
-**Question rows** (`questions` table):
+**Question rows** (`questions` table): add `questionType: text`, `allowSuggestions: true`, and
+`allowVoting: true` to each question.
 
 | PartitionKey | RowKey | title | imageUrl | sortOrder |
 |---|---|---|---|---|
@@ -193,16 +219,15 @@ Accessible at: **`/c/ninja-naming`**
 | title | `Best Padeller 2026` |
 | description | `Nominate and vote for the best padeller of 2026.` |
 | status | `active` |
-| allowSuggestions | `true` |
 | maxVotesTotal | `3` |
 | maxVotesPerCategory | `3` |
 | maxVotesPerCandidate | `2` |
 
 **Question row** (`questions` table):
 
-| PartitionKey | RowKey | title | description | imageUrl | sortOrder |
-|---|---|---|---|---|---|
-| `best-padeller-2026` | `nominees` | Who do you nominate? | Suggest and vote for your favourite padeller. | *(empty)* | 1 |
+| PartitionKey | RowKey | title | description | questionType | allowSuggestions | allowVoting | imageUrl | sortOrder |
+|---|---|---|---|---|---|---|---|---|
+| `best-padeller-2026` | `nominees` | Who do you nominate? | Suggest and vote for your favourite padeller. | `text` | `true` | `true` | *(empty)* | 1 |
 
 > **Note on imageUrl:** Leave `imageUrl` empty for questions without an image — the card renders gracefully without one. For now, you can point `imageUrl` at existing files in the `/public/mascots/` directory (e.g. `/mascots/ninja1.png`). Image upload and Blob Storage are planned for a future release.
 
@@ -216,6 +241,8 @@ Accessible at: **`/c/best-padeller-2026`**
 | `GET` | `/api/questions?campaignId=X` | Returns questions for a campaign, sorted by `sortOrder` |
 | `GET` | `/api/suggestions?campaignId=X` | Returns all suggestions for a campaign |
 | `POST` | `/api/suggestions` | Submit a new suggestion |
+| `GET` | `/api/responses?campaignId=X` | Returns aggregated structured answer counts |
+| `POST` | `/api/responses` | Submit or replace a structured answer for this session |
 | `GET` | `/api/votes?campaignId=X&sessionId=Y` | Returns vote counts per suggestion `{ [suggestionId]: count }` for this session |
 | `POST` | `/api/votes` | Cast or revoke a vote |
 
@@ -326,7 +353,8 @@ Browser (React + Vite)
                         └──►  Azure Table Storage
                                   ├── campaigns    (campaign configuration)
                                   ├── questions    (questions per campaign)
-                                  ├── suggestions  (mascot name suggestions)
+                                  ├── suggestions  (text suggestions)
+                                  ├── questionResponses (structured answers)
                                   └── votes        (per-session vote tracking)
 ```
 
@@ -344,6 +372,7 @@ the Azure Functions backend. The only thing stored in the browser is an anonymou
 | Table: `campaigns` | Created automatically; seeded with ninja-naming on first request |
 | Table: `questions` | Created automatically; seeded with ninja questions on first request |
 | Table: `suggestions` | Created automatically on first write |
+| Table: `questionResponses` | Created automatically on first response |
 | Table: `votes` | Created automatically on first write |
 | Azure Functions App | Node.js 20+, v4 programming model |
 
@@ -372,7 +401,6 @@ Stores campaign configuration. Each row is one campaign.
 | `title` | string | Displayed as the page heading |
 | `description` | string | Displayed below the heading |
 | `status` | string | `"active"` or `"closed"`. Only active campaigns are served |
-| `allowSuggestions` | bool | Whether users can submit new suggestions |
 | `maxVotesTotal` | int | Max votes per session across the whole campaign (0 = unlimited) |
 | `maxVotesPerCategory` | int | Max votes per session within one question (0 = unlimited) |
 | `maxVotesPerCandidate` | int | Max votes per session for a single suggestion (0 = unlimited) |
@@ -391,6 +419,11 @@ Stores questions (categories) for a campaign. Each row is one question.
 | `description` | string | Short description shown on the question card |
 | `imageUrl` | string | Optional. Path to question image (e.g. `/mascots/ninja1.png`) |
 | `sortOrder` | int | Questions are sorted ascending by this value |
+| `questionType` | string | One of the six supported types described above |
+| `allowSuggestions` | bool | On text questions, whether users may suggest candidates |
+| `allowVoting` | bool | Optional; only valid for text questions |
+| `options` | JSON string | JSON-encoded string array required for categorical and ordinal questions |
+| `numericMin`, `numericMax` | number | Optional inclusive numeric-answer bounds |
 | `createdAt` | string | ISO 8601 timestamp |
 | `updatedAt` | string | ISO 8601 timestamp |
 
@@ -420,6 +453,12 @@ Tracks which suggestions each browser session has voted for.
 | `suggestionId` | string | The suggestion that was voted for |
 | `createdAt` | string | ISO 8601 timestamp |
 
+### `questionResponses` table
+
+Stores the current structured answer for each session and question. Categorical and ordinal
+responses are validated against their configured options; numeric bounds are enforced by the API.
+Text suggestions are stored separately and voting is available only when enabled on a Text question.
+
 ## Default ninja campaign seeding
 
 On the first request to `GET /api/campaign`, the backend checks whether the `ninja-naming`
@@ -428,7 +467,7 @@ campaign exists in the `campaigns` table. If it does not, it seeds:
 **Campaign:**
 - `campaignId`: `ninja-naming`
 - `title`: These four ninjas need names
-- `status`: active, `allowSuggestions`: true
+- `status`: active
 - `maxVotesTotal`: 4, `maxVotesPerCategory`: 1, `maxVotesPerCandidate`: 1
 
 **Questions:** Ninja 1–4, each with an image from `/public/mascots/ninja{1-4}.png`
@@ -450,13 +489,13 @@ Insert into the **campaigns** table:
 | title | `Who is the best padeller?` |
 | description | `Vote for your favourite padel player!` |
 | status | `active` |
-| allowSuggestions | `false` |
 | maxVotesTotal | `3` |
 | maxVotesPerCategory | `1` |
 | maxVotesPerCandidate | `1` |
 | createdAt / updatedAt | ISO timestamp |
 
-Insert into the **questions** table (one row per player):
+Insert into the **questions** table (one row per player), using `questionType: text`,
+`allowSuggestions: false`, and `allowVoting: true` for voting-only questions:
 
 | PartitionKey | RowKey | title | sortOrder |
 |---|---|---|---|
@@ -465,7 +504,8 @@ Insert into the **questions** table (one row per player):
 
 > **Note**: Set the `ninja-naming` campaign `status` to `closed` to hide it from the app once a new active campaign is running.
 
-When `allowSuggestions` is `false`, the public campaign page hides the submission form and switches to a voting-only experience.
+Configure `allowSuggestions` on each Text question. When false, that question has no suggestion form;
+`allowVoting` can still enable voting on its previously published candidates.
 
 ### Example: "Where should we eat next week?"
 
@@ -478,13 +518,13 @@ Insert into the **campaigns** table:
 | title | `Where should we eat next week?` |
 | description | `Suggest and vote for your favourite lunch spot.` |
 | status | `active` |
-| allowSuggestions | `true` |
 | maxVotesTotal | `2` |
 | maxVotesPerCategory | `2` |
 | maxVotesPerCandidate | `1` |
 | createdAt / updatedAt | ISO timestamp |
 
-Insert into the **questions** table (one row per day or one global "lunch" category):
+Insert into the **questions** table (one row per day or one global "lunch" category), setting
+`questionType: text`, `allowSuggestions: true`, and `allowVoting: true`:
 
 | PartitionKey | RowKey | title | sortOrder |
 |---|---|---|---|
@@ -500,6 +540,8 @@ Insert into the **questions** table (one row per day or one global "lunch" categ
 | `GET` | `/api/questions?campaignId=X` | Returns questions for a campaign, sorted by `sortOrder` |
 | `GET` | `/api/suggestions?campaignId=X` | Returns all suggestions for a campaign |
 | `POST` | `/api/suggestions` | Submit a new suggestion |
+| `GET` | `/api/responses?campaignId=X` | Returns aggregated structured answer counts |
+| `POST` | `/api/responses` | Submit or replace a structured answer for this session |
 | `GET` | `/api/votes?campaignId=X&sessionId=Y` | Returns suggestion IDs voted for by this session |
 | `POST` | `/api/votes` | Cast or revoke a vote |
 

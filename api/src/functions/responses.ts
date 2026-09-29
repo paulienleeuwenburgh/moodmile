@@ -25,7 +25,7 @@ async function getResponses(request: HttpRequest, _context: InvocationContext): 
     } catch {
       continue
     }
-    const key = `${entity.questionId}|${JSON.stringify(answer)}`
+    const key = JSON.stringify([entity.questionId, answer])
     const existing = grouped.get(key)
     if (existing) {
       existing.count += 1
@@ -53,6 +53,9 @@ async function postResponse(request: HttpRequest, _context: InvocationContext): 
   const sessionId = body.sessionId?.trim()
   if (!campaignId || !questionId || !sessionId || body.answer === undefined) {
     return { status: 400, jsonBody: { error: 'campaignId, questionId, sessionId and answer are required' } }
+  }
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(sessionId)) {
+    return { status: 400, jsonBody: { error: 'sessionId must be a valid UUID' } }
   }
 
   const question = await getQuestionConfig(campaignId, questionId)

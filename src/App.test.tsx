@@ -993,6 +993,7 @@ describe('suggestion board heading', () => {
         description: undefined,
         sortOrder: 1,
         questionType: 'text',
+        allowSuggestions: true,
         allowVoting: true,
       },
     ] as unknown as Question[]
@@ -1154,6 +1155,48 @@ describe('suggestion availability', () => {
     expect(screen.getByText(
       'This question is in voting-only mode. You can still review published candidates and cast votes.',
     )).toBeInTheDocument()
+  })
+})
+
+describe('typed questions', () => {
+  it('renders the configured categorical answer control and posts the selected answer', async () => {
+    const question: Question = {
+      id: 'color',
+      campaignId: 'ninja-naming',
+      title: 'Favorite color?',
+      description: '',
+      sortOrder: 1,
+      questionType: 'categorical-single',
+      allowSuggestions: false,
+      options: ['Red', 'Blue'],
+    }
+    setupApi([], [], ninjaCampaign, [question])
+    render(<App campaignId="ninja-naming" />)
+
+    await userEvent.click(await screen.findByRole('radio', { name: 'Blue' }))
+    await userEvent.click(screen.getByRole('button', { name: /submit answer/i }))
+
+    await waitFor(() =>
+      expect(mockPostQuestionResponse).toHaveBeenCalledWith(
+        'ninja-naming',
+        'color',
+        'Blue',
+        expect.stringMatching(/^[0-9a-f-]{36}$/i),
+      ),
+    )
+  })
+
+  it('does not show voting controls for text questions with voting disabled', async () => {
+    const question: Question = {
+      ...ninjaQuestions[0],
+      allowVoting: false,
+    }
+    setupApi([{ ...testSuggestion }], [], ninjaCampaign, [question])
+    render(<App campaignId="ninja-naming" />)
+
+    await screen.findAllByText('Rocket')
+    expect(screen.queryByRole('button', { name: /vote for rocket/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('complementary', { name: /voting rules/i })).not.toBeInTheDocument()
   })
 })
 

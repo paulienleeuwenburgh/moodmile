@@ -101,7 +101,7 @@ export interface QuestionEntity {
   questionType?: QuestionType
   allowSuggestions?: boolean
   allowVoting?: boolean
-  options?: string[]
+  options?: string
   numericMin?: number
   numericMax?: number
   imageUrl?: string
@@ -134,6 +134,17 @@ export function entityToCampaignConfig(entity: TableEntityResult<CampaignEntity>
 }
 
 export function entityToQuestion(entity: TableEntityResult<QuestionEntity>) {
+  let options: string[] | undefined
+  if (typeof entity.options === 'string') {
+    try {
+      const parsed: unknown = JSON.parse(entity.options)
+      if (Array.isArray(parsed) && parsed.every((option) => typeof option === 'string')) {
+        options = parsed
+      }
+    } catch {
+      options = undefined
+    }
+  }
   return {
     id: entity.rowKey as string,
     campaignId: entity.partitionKey as string,
@@ -142,7 +153,7 @@ export function entityToQuestion(entity: TableEntityResult<QuestionEntity>) {
     questionType: entity.questionType ?? 'text',
     allowSuggestions: entity.allowSuggestions ?? true,
     allowVoting: entity.allowVoting ?? (entity.questionType === undefined ? true : undefined),
-    options: entity.options,
+    options,
     numericMin: entity.numericMin,
     numericMax: entity.numericMax,
     imageUrl: entity.imageUrl,
