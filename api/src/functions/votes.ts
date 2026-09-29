@@ -11,7 +11,7 @@ import {
   votePartitionKey,
 } from '../tableClient'
 import { escapeODataString } from '../odata'
-import { getCampaign } from '../campaigns'
+import { getCampaign, getQuestionConfig } from '../campaigns'
 import { canCastVote, filterVoteRecordsByActiveSuggestions, type VoteRecord } from '../voteLimits'
 
 interface StoredVoteRecord extends VoteRecord {
@@ -119,6 +119,13 @@ async function postVote(
   if (!campaign) {
     return { status: 404, jsonBody: { error: 'Campaign not found' } }
   }
+  const question = await getQuestionConfig(campaignId, questionId)
+  if (!question) {
+    return { status: 404, jsonBody: { error: 'Question not found' } }
+  }
+  if (!revoke && (question.questionType !== 'text' || (question.numberOfVotes ?? 0) <= 0)) {
+    return { status: 403, jsonBody: { error: 'Voting is not enabled for this question' } }
+  }
 
   const votesClient = getVotesClient()
   const suggestionsClient = getSuggestionsClient()
@@ -175,7 +182,14 @@ async function postVote(
     return { status: 200, jsonBody: updated, headers: { 'Content-Type': 'application/json' } }
   }
 
-  const voteCheck = canCastVote(campaign, voteRecords, questionId, suggestionId)
+  const voteCheck = canCastVote(
+    campaign,
+    voteRecords,
+    questionId,
+    suggestionId,
+    question.numberOfVotes ?? 0,
+    question.duplicateVotingAllowed ?? false,
+  )
   if (!voteCheck.allowed) {
     return {
       status: 409,
@@ -187,7 +201,7 @@ async function postVote(
   // Use rowKey = suggestionId for single-vote-per-candidate campaigns, a unique
   // key otherwise so multiple votes for the same candidate don't collide.
   const voteRowKey =
-    campaign.maxVotesPerCandidate === 1
+    !question.duplicateVotingAllowed
       ? suggestionId
       : `${suggestionId}|${crypto.randomUUID()}`
   const createdAt = new Date().toISOString()

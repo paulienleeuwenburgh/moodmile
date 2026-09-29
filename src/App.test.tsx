@@ -6,7 +6,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
-import type { Campaign, Question, Suggestion } from './types'
+import type { Campaign, Question, QuestionResponse, Suggestion } from './types'
 
 const appStyles = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), 'App.css'), 'utf8')
 
@@ -17,6 +17,8 @@ const mockFetchCampaign = vi.fn<(campaignId: string) => Promise<Campaign>>()
 const mockFetchQuestions = vi.fn<(campaignId: string) => Promise<Question[]>>()
 const mockFetchSuggestions = vi.fn<(campaignId: string) => Promise<Suggestion[]>>()
 const mockFetchVoteCounts = vi.fn<(campaignId: string, sessionId: string) => Promise<Map<string, number>>>()
+const mockFetchQuestionResponses = vi.fn<(campaignId: string) => Promise<QuestionResponse[]>>()
+const mockPostQuestionResponse = vi.fn<(campaignId: string, questionId: string, answer: QuestionResponse['answer'] | undefined, sessionId: string) => Promise<void>>()
 const mockPostSuggestion = vi.fn<
   (campaignId: string, questionId: string, name: string, sessionId: string) => Promise<Suggestion | null>
 >()
@@ -38,6 +40,8 @@ vi.mock('./api', () => ({
   fetchSuggestions: (...args: Parameters<typeof mockFetchSuggestions>) =>
     mockFetchSuggestions(...args),
   fetchVoteCounts: (...args: Parameters<typeof mockFetchVoteCounts>) => mockFetchVoteCounts(...args),
+  fetchQuestionResponses: (...args: Parameters<typeof mockFetchQuestionResponses>) => mockFetchQuestionResponses(...args),
+  postQuestionResponse: (...args: Parameters<typeof mockPostQuestionResponse>) => mockPostQuestionResponse(...args),
   postSuggestion: (...args: Parameters<typeof mockPostSuggestion>) => mockPostSuggestion(...args),
   postVote: (...args: Parameters<typeof mockPostVote>) => mockPostVote(...args),
 }))
@@ -52,17 +56,16 @@ const ninjaCampaign: Campaign = {
   description: 'Help us name our four ninja mascots by suggesting and voting for your favorites.',
   status: 'active',
   createdAt: '2024-01-01T00:00:00.000Z',
-  allowSuggestions: true,
   maxVotesTotal: 4,
   maxVotesPerCategory: 1,
   maxVotesPerCandidate: 1,
 }
 
 const ninjaQuestions: Question[] = [
-  { id: 'ninja-1', campaignId: 'ninja-naming', title: 'Ninja 1', description: 'This ninja needs a name.', imageUrl: '/mascots/ninja1.png', sortOrder: 1 },
-  { id: 'ninja-2', campaignId: 'ninja-naming', title: 'Ninja 2', description: 'This ninja needs a name.', imageUrl: '/mascots/ninja2.png', sortOrder: 2 },
-  { id: 'ninja-3', campaignId: 'ninja-naming', title: 'Ninja 3', description: 'This ninja needs a name.', imageUrl: '/mascots/ninja3.png', sortOrder: 3 },
-  { id: 'ninja-4', campaignId: 'ninja-naming', title: 'Ninja 4', description: 'This ninja needs a name.', imageUrl: '/mascots/ninja4.png', sortOrder: 4 },
+  { id: 'ninja-1', campaignId: 'ninja-naming', title: 'Ninja 1', description: 'This ninja needs a name.', status: 'active', imageUrl: '/mascots/ninja1.png', sortOrder: 1, questionType: 'text', allowSuggestions: true, numberOfVotes: 1, duplicateVotingAllowed: false },
+  { id: 'ninja-2', campaignId: 'ninja-naming', title: 'Ninja 2', description: 'This ninja needs a name.', status: 'active', imageUrl: '/mascots/ninja2.png', sortOrder: 2, questionType: 'text', allowSuggestions: true, numberOfVotes: 1, duplicateVotingAllowed: false },
+  { id: 'ninja-3', campaignId: 'ninja-naming', title: 'Ninja 3', description: 'This ninja needs a name.', status: 'active', imageUrl: '/mascots/ninja3.png', sortOrder: 3, questionType: 'text', allowSuggestions: true, numberOfVotes: 1, duplicateVotingAllowed: false },
+  { id: 'ninja-4', campaignId: 'ninja-naming', title: 'Ninja 4', description: 'This ninja needs a name.', status: 'active', imageUrl: '/mascots/ninja4.png', sortOrder: 4, questionType: 'text', allowSuggestions: true, numberOfVotes: 1, duplicateVotingAllowed: false },
 ]
 
 // ---------------------------------------------------------------------------
@@ -85,13 +88,18 @@ function setupApi(
   questions: Question[] = ninjaQuestions,
 ) {
   mockFetchCampaign.mockResolvedValue(campaign)
-  mockFetchQuestions.mockResolvedValue(questions)
+  mockFetchQuestions.mockResolvedValue(questions.map((question) => ({
+    ...question,
+    status: question.status ?? 'active',
+  })))
   mockFetchSuggestions.mockResolvedValue(suggestions)
   mockFetchVoteCounts.mockResolvedValue(
     voteCounts instanceof Map
       ? voteCounts
       : new Map(voteCounts.map((id) => [id, 1] as [string, number])),
   )
+  mockFetchQuestionResponses.mockResolvedValue([])
+  mockPostQuestionResponse.mockResolvedValue(undefined)
   mockPostSuggestion.mockImplementation(async (campaignId, questionId, name) => {
     const isDuplicate = suggestions.some(
       (s) => s.questionId === questionId && s.name.trim().toLowerCase() === name.trim().toLowerCase(),
@@ -108,6 +116,7 @@ function setupApi(
     suggestions.push(created)
     return created
   })
+
   mockPostVote.mockImplementation(async (_campaignId, _questionId, suggestionId, _sessionId, revoke) => {
     const idx = suggestions.findIndex((s) => s.id === suggestionId)
     if (idx === -1) return null
@@ -145,6 +154,7 @@ beforeEach(() => {
   mockFetchQuestions.mockResolvedValue(ninjaQuestions)
   mockFetchSuggestions.mockResolvedValue([])
   mockFetchVoteCounts.mockResolvedValue(new Map())
+  mockFetchQuestionResponses.mockResolvedValue([])
 })
 
 afterEach(() => {
@@ -322,10 +332,10 @@ describe('suggestion board ordering', () => {
 
 describe('duplicate suggestions', () => {
   async function submitSuggestion(name: string) {
-    const input = await screen.findByRole('textbox', { name: /your answer/i })
+    const input = (await screen.findAllByRole('textbox', { name: /your answer/i }))[0]
     await userEvent.clear(input)
     await userEvent.type(input, name)
-    await userEvent.click(screen.getByRole('button', { name: /submit/i }))
+    await userEvent.click(screen.getAllByRole('button', { name: /submit/i })[0])
   }
 
   function getSuggestionNames() {
@@ -362,32 +372,29 @@ describe('duplicate suggestions', () => {
     setupApi()
     render(<App campaignId="ninja-naming" />)
 
-    const select = await screen.findByRole('combobox', { name: /question/i })
-    const options = Array.from(select.querySelectorAll('option'))
-    if (options.length < 2) {
-      return
+    const questions = await screen.findAllByRole('region', { name: /^Ninja [12]$/ })
+    for (const question of questions) {
+      const input = within(question).getByRole('textbox', { name: /your answer/i })
+      await userEvent.type(input, 'Star')
+      await userEvent.click(within(question).getByRole('button', { name: /submit/i }))
     }
 
-    await userEvent.selectOptions(select, options[0].value)
-    await submitSuggestion('Star')
-
-    await userEvent.selectOptions(select, options[1].value)
-    await submitSuggestion('Star')
-
     expect(getSuggestionNames().filter((n) => n === 'Star')).toHaveLength(2)
+    expect(mockPostSuggestion).toHaveBeenNthCalledWith(1, 'ninja-naming', 'ninja-1', 'Star', expect.any(String))
+    expect(mockPostSuggestion).toHaveBeenNthCalledWith(2, 'ninja-naming', 'ninja-2', 'Star', expect.any(String))
   })
 })
 
 describe('input validation', () => {
   async function typeInSuggestion(name: string) {
-    const input = await screen.findByRole('textbox', { name: /your answer/i })
+    const input = (await screen.findAllByRole('textbox', { name: /your answer/i }))[0]
     await userEvent.clear(input)
     await userEvent.type(input, name)
   }
 
   async function submitSuggestion(name: string) {
     await typeInSuggestion(name)
-    await userEvent.click(screen.getByRole('button', { name: /submit/i }))
+    await userEvent.click(screen.getAllByRole('button', { name: /submit/i })[0])
   }
 
   function getSuggestionNames() {
@@ -426,19 +433,21 @@ describe('input validation', () => {
   it('shows the remaining character count under the answer input', async () => {
     setupApi()
     render(<App campaignId="ninja-naming" />)
-    await screen.findByRole('textbox', { name: /your answer/i })
-    expect(screen.getByText('250 characters left')).toBeInTheDocument()
+    await screen.findAllByRole('textbox', { name: /your answer/i })
+    expect(screen.getAllByText('250 characters left')).toHaveLength(4)
     await typeInSuggestion('Good 😊')
     expect(screen.getByText('244 characters left')).toBeInTheDocument()
   })
 
-  it('shows an error and does not submit when the answer exceeds 250 characters', async () => {
-    setupApi()
+  it('shows an error and does not submit when the answer exceeds the question maxSize', async () => {
+    const question = { ...ninjaQuestions[0], maxSize: 4 }
+    setupApi([], [], ninjaCampaign, [question])
     render(<App campaignId="ninja-naming" />)
-    await typeInSuggestion('a'.repeat(251))
+    const input = (await screen.findAllByRole('textbox', { name: /your answer/i }))[0]
+    fireEvent.change(input, { target: { value: 'abcde' } })
     expect(screen.getByText('1 character over limit')).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: /submit/i }))
-    expect(screen.getByRole('alert')).toHaveTextContent('Answers can be up to 250 characters long.')
+    await userEvent.click(screen.getAllByRole('button', { name: /submit/i })[0])
+    expect(screen.getByRole('alert')).toHaveTextContent('Answers can be up to 4 characters long.')
     expect(getSuggestionNames()).toHaveLength(0)
   })
 
@@ -455,7 +464,7 @@ describe('input validation', () => {
   it('clears the error when input becomes valid', async () => {
     setupApi()
     render(<App campaignId="ninja-naming" />)
-    const input = await screen.findByRole('textbox', { name: /your answer/i })
+    const input = (await screen.findAllByRole('textbox', { name: /your answer/i }))[0]
     await userEvent.type(input, '<script>')
     expect(screen.getByRole('alert')).toBeInTheDocument()
     await userEvent.clear(input)
@@ -558,7 +567,7 @@ describe('leaderboard', () => {
     setupApi()
     render(<App campaignId="ninja-naming" />)
     // Wait for loading to finish then assert
-    await screen.findByRole('button', { name: /submit/i })
+    await screen.findAllByRole('button', { name: /submit/i })
     expect(document.querySelector('.leaderboard')).not.toBeInTheDocument()
   })
 })
@@ -567,7 +576,7 @@ describe('VotingRules', () => {
   it('shows voting rules on load', async () => {
     setupApi()
     render(<App campaignId="ninja-naming" />)
-    await screen.findByRole('button', { name: /submit/i })
+    await screen.findAllByRole('button', { name: /submit/i })
 
     const rules = screen.getByRole('complementary', { name: /voting rules/i })
     expect(rules).toBeInTheDocument()
@@ -616,7 +625,7 @@ describe('VotingRules', () => {
       maxVotesPerCategory: 3,
     })
     render(<App campaignId="ninja-naming" />)
-    await screen.findByRole('button', { name: /submit/i })
+    await screen.findAllByRole('button', { name: /submit/i })
 
     const rules = screen.getByRole('complementary', { name: /voting rules/i })
     expect(rules).toHaveTextContent(/3 of 3 total votes remaining/i)
@@ -633,10 +642,10 @@ describe('VotingRules', () => {
       maxVotesPerCandidate: 2,
       maxVotesPerCategory: 3,
     }, [
-      { id: 'nominees', campaignId: 'best-padeller-2026', title: 'Nominees', description: 'desc', sortOrder: 1 },
+      { id: 'nominees', campaignId: 'best-padeller-2026', title: 'Nominees', description: 'desc', sortOrder: 1, questionType: 'text', allowSuggestions: true, numberOfVotes: 1, duplicateVotingAllowed: false },
     ])
     render(<App campaignId="best-padeller-2026" />)
-    await screen.findByRole('button', { name: /submit/i })
+    await screen.findAllByRole('button', { name: /submit/i })
 
     const rules = screen.getByRole('complementary', { name: /voting rules/i })
     expect(rules).toHaveTextContent(/3 of 3 total votes remaining/i)
@@ -787,6 +796,12 @@ describe('stale data refresh UX', () => {
 // ---------------------------------------------------------------------------
 
 describe('vote budget after soft delete', () => {
+  const multiVoteNinjaQuestions = ninjaQuestions.map((question) => ({
+    ...question,
+    numberOfVotes: 3,
+    duplicateVotingAllowed: true,
+  }))
+
   it('soft-deleted candidates release their votes back to the voter budget', async () => {
     // Campaign allows 3 total votes, up to 2 per candidate.
     const multiVoteCampaign: Campaign = {
@@ -805,7 +820,7 @@ describe('vote budget after soft delete', () => {
     }
     const voteCounts = new Map<string, number>([['rogier', 1]])
     mockFetchCampaign.mockResolvedValue(multiVoteCampaign)
-    mockFetchQuestions.mockResolvedValue(ninjaQuestions)
+    mockFetchQuestions.mockResolvedValue(multiVoteNinjaQuestions)
     mockFetchSuggestions.mockResolvedValue([rogier])
     mockFetchVoteCounts.mockResolvedValue(voteCounts)
 
@@ -847,7 +862,7 @@ describe('vote budget after soft delete', () => {
       ['rogier', 1],
     ])
     mockFetchCampaign.mockResolvedValue(multiVoteCampaign)
-    mockFetchQuestions.mockResolvedValue(ninjaQuestions)
+    mockFetchQuestions.mockResolvedValue(multiVoteNinjaQuestions)
     mockFetchSuggestions.mockResolvedValue([marja, rogier])
     mockFetchVoteCounts.mockResolvedValue(voteCounts)
 
@@ -878,7 +893,7 @@ describe('vote budget after soft delete', () => {
     // Marta had 0 votes and was deleted — voteCountById has no entry for her.
     const voteCounts = new Map<string, number>([['rogier', 1]])
     mockFetchCampaign.mockResolvedValue(multiVoteCampaign)
-    mockFetchQuestions.mockResolvedValue(ninjaQuestions)
+    mockFetchQuestions.mockResolvedValue(multiVoteNinjaQuestions)
     mockFetchSuggestions.mockResolvedValue([rogier])
     mockFetchVoteCounts.mockResolvedValue(voteCounts)
 
@@ -920,7 +935,7 @@ describe('campaign config loaded from storage', () => {
   it('fetches questions using the campaign ID returned by the API', async () => {
     setupApi()
     render(<App campaignId="ninja-naming" />)
-    await screen.findByRole('button', { name: /submit/i })
+    await screen.findAllByRole('button', { name: /submit/i })
     expect(mockFetchQuestions).toHaveBeenCalledWith('ninja-naming')
   })
 })
@@ -928,8 +943,8 @@ describe('campaign config loaded from storage', () => {
 describe('questions loaded from storage', () => {
   it('renders question titles from the API response', async () => {
     const customQuestions: Question[] = [
-      { id: 'q-1', campaignId: 'ninja-naming', title: 'Custom Ninja A', description: 'desc', sortOrder: 1 },
-      { id: 'q-2', campaignId: 'ninja-naming', title: 'Custom Ninja B', description: 'desc', sortOrder: 2 },
+      { id: 'q-1', campaignId: 'ninja-naming', title: 'Custom Ninja A', description: 'desc', sortOrder: 1, questionType: 'text', allowSuggestions: true, numberOfVotes: 1, duplicateVotingAllowed: false },
+      { id: 'q-2', campaignId: 'ninja-naming', title: 'Custom Ninja B', description: 'desc', sortOrder: 2, questionType: 'text', allowSuggestions: true, numberOfVotes: 1, duplicateVotingAllowed: false },
     ]
     setupApi([], [], ninjaCampaign, customQuestions)
     render(<App campaignId="ninja-naming" />)
@@ -938,40 +953,43 @@ describe('questions loaded from storage', () => {
     expect(screen.getAllByText('Custom Ninja B')).not.toHaveLength(0)
   })
 
-  it('shows custom question in the suggestion form dropdown', async () => {
+  it('shows each text question with its own suggestion form', async () => {
     const customQuestions: Question[] = [
-      { id: 'q-special', campaignId: 'ninja-naming', title: 'The Special Ninja', description: 'desc', sortOrder: 1 },
+      { id: 'q-special', campaignId: 'ninja-naming', title: 'The Special Ninja', description: 'desc', sortOrder: 1, questionType: 'text', allowSuggestions: true, numberOfVotes: 1, duplicateVotingAllowed: false },
     ]
     setupApi([], [], ninjaCampaign, customQuestions)
     render(<App campaignId="ninja-naming" />)
-    // Wait until questions are loaded and the combobox shows the custom question
-    await screen.findAllByText('The Special Ninja')
-    const select = screen.getByRole('combobox', { name: /question/i })
-    expect(select).toHaveTextContent('The Special Ninja')
+    const question = await screen.findByRole('region', { name: 'The Special Ninja' })
+    expect(within(question).getByRole('textbox', { name: /your answer/i })).toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: /question/i })).not.toBeInTheDocument()
   })
 })
 
 describe('suggestion board heading', () => {
-  it('hides the question card title for single-question campaigns while keeping the description', async () => {
+  it('shows the question title and description for single-question campaigns', async () => {
     const singleQuestion: Question[] = [
       {
         id: 'q-special',
         campaignId: 'ninja-naming',
         title: 'The Special Ninja',
-        description: 'Only the description should appear in the card.',
+        description: 'The question description should appear in the card.',
         imageUrl: '/special-ninja.png',
         sortOrder: 1,
+        questionType: 'text',
+        allowSuggestions: true,
+        numberOfVotes: 1,
+        duplicateVotingAllowed: false,
       },
     ]
     setupApi([], [], ninjaCampaign, singleQuestion)
     render(<App campaignId="ninja-naming" />)
 
-    await screen.findByText('Only the description should appear in the card.')
+    await screen.findByText('The question description should appear in the card.')
 
     const questionCard = document.querySelector('.question-card') as HTMLElement | null
     expect(questionCard).not.toBeNull()
-    expect(within(questionCard!).queryByRole('heading', { name: 'The Special Ninja' })).not.toBeInTheDocument()
-    expect(within(questionCard!).getByText('Only the description should appear in the card.')).toBeInTheDocument()
+    expect(within(questionCard!).getByRole('heading', { name: 'The Special Ninja' })).toBeInTheDocument()
+    expect(within(questionCard!).getByText('The question description should appear in the card.')).toBeInTheDocument()
     expect(questionCard!.querySelector('img')).toHaveAttribute('src', '/special-ninja.png')
   })
 
@@ -983,6 +1001,10 @@ describe('suggestion board heading', () => {
         title: 'The Special Ninja',
         description: undefined,
         sortOrder: 1,
+        questionType: 'text',
+        allowSuggestions: true,
+        numberOfVotes: 1,
+        duplicateVotingAllowed: false,
       },
     ] as unknown as Question[]
 
@@ -991,13 +1013,13 @@ describe('suggestion board heading', () => {
 
     await screen.findByText('These four ninjas need names')
 
-    expect(screen.getByRole('heading', { name: /share your thoughts/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /your answer/i })).toBeInTheDocument()
     expect(screen.getByRole('region', { name: /suggestions/i })).toBeInTheDocument()
   })
 
   it('hides "Suggestions by question" when there is only one question', async () => {
     const singleQuestion: Question[] = [
-      { id: 'q-special', campaignId: 'ninja-naming', title: 'The Special Ninja', description: 'desc', sortOrder: 1 },
+      { id: 'q-special', campaignId: 'ninja-naming', title: 'The Special Ninja', description: 'desc', sortOrder: 1, questionType: 'text', allowSuggestions: true, numberOfVotes: 1, duplicateVotingAllowed: false },
     ]
     setupApi([], [], ninjaCampaign, singleQuestion)
     render(<App campaignId="ninja-naming" />)
@@ -1066,14 +1088,13 @@ describe('campaign routing', () => {
     description: 'Nominate and vote for the best padeller of 2026.',
     status: 'active',
     createdAt: '2024-01-01T00:00:00.000Z',
-    allowSuggestions: true,
     maxVotesTotal: 3,
     maxVotesPerCategory: 3,
     maxVotesPerCandidate: 2,
   }
 
   const padelleQuestions: Question[] = [
-    { id: 'nominees', campaignId: 'best-padeller-2026', title: 'Who do you nominate?', description: 'Suggest and vote for your favourite padeller.', sortOrder: 1 },
+    { id: 'nominees', campaignId: 'best-padeller-2026', title: 'Who do you nominate?', description: 'Suggest and vote for your favourite padeller.', status: 'active', sortOrder: 1, questionType: 'text', allowSuggestions: true, numberOfVotes: 1, duplicateVotingAllowed: false },
   ]
 
   it('renders the ninja campaign when campaignId=ninja-naming is passed', async () => {
@@ -1128,13 +1149,12 @@ describe('suggestion availability', () => {
       id: 'best-padeller-2026',
       title: 'Best Padeller 2026',
       description: 'Vote for the best padeller.',
-      allowSuggestions: false,
       maxVotesTotal: 3,
       maxVotesPerCategory: 3,
       maxVotesPerCandidate: 2,
     }
     const votingOnlyQuestions: Question[] = [
-      { id: 'nominees', campaignId: 'best-padeller-2026', title: 'Who do you nominate?', description: 'Suggest and vote for your favourite padeller.', sortOrder: 1 },
+      { id: 'nominees', campaignId: 'best-padeller-2026', title: 'Who do you nominate?', description: 'Suggest and vote for your favourite padeller.', sortOrder: 1, questionType: 'text', allowSuggestions: false, numberOfVotes: 1, duplicateVotingAllowed: false },
     ]
 
     setupApi([], [], votingOnlyCampaign, votingOnlyQuestions)
@@ -1142,11 +1162,231 @@ describe('suggestion availability', () => {
 
     await screen.findByRole('heading', { name: /suggestions are closed/i })
     expect(screen.queryByRole('heading', { name: /share your thoughts/i })).not.toBeInTheDocument()
-    expect(
-      screen.getByText(
-        'This campaign is in voting-only mode. You can still review the published candidates and cast votes.',
+    expect(screen.getByText(
+      'This question is in voting-only mode. You can still review published candidates and cast votes.',
+    )).toBeInTheDocument()
+  })
+})
+
+describe('typed questions', () => {
+  it('renders the configured categorical answer control and posts the selected answer', async () => {
+    const question: Question = {
+      id: 'color',
+      campaignId: 'ninja-naming',
+      title: 'Favorite color?',
+      description: '',
+      sortOrder: 1,
+      questionType: 'categorical',
+      allowSuggestions: false,
+      options: ['Red', 'Blue'],
+    }
+    setupApi([], [], ninjaCampaign, [question])
+    render(<App campaignId="ninja-naming" />)
+
+    await screen.findByRole('radio', { name: 'Blue' })
+    expect(document.querySelector('.question-card__image-wrap')).not.toBeInTheDocument()
+    await userEvent.click(await screen.findByRole('radio', { name: 'Blue' }))
+    await userEvent.click(screen.getByRole('button', { name: /submit answer/i }))
+
+    await waitFor(() =>
+      expect(mockPostQuestionResponse).toHaveBeenCalledWith(
+        'ninja-naming',
+        'color',
+        ['Blue'],
+        expect.stringMatching(/^[0-9a-f-]{36}$/i),
       ),
-    ).toBeInTheDocument()
+    )
+  })
+
+  it('allows an optional categorical question to be submitted unanswered', async () => {
+    const question: Question = {
+      id: 'color',
+      campaignId: 'ninja-naming',
+      title: 'Favorite color?',
+      description: '',
+      sortOrder: 1,
+      questionType: 'categorical',
+      allowSuggestions: false,
+      options: ['Red', 'Blue'],
+    }
+    setupApi([], [], ninjaCampaign, [question])
+    render(<App campaignId="ninja-naming" />)
+
+    await userEvent.click(await screen.findByRole('button', { name: /submit answer/i }))
+    await waitFor(() => expect(mockPostQuestionResponse).toHaveBeenCalledWith(
+      'ninja-naming',
+      'color',
+      undefined,
+      expect.stringMatching(/^[0-9a-f-]{36}$/i),
+    ))
+  })
+
+  it('supports multiple categorical votes and repeated choices when configured', async () => {
+    const question: Question = {
+      id: 'color',
+      campaignId: 'ninja-naming',
+      title: 'Favorite color?',
+      description: '',
+      sortOrder: 1,
+      questionType: 'categorical',
+      allowSuggestions: false,
+      numberOfVotes: 3,
+      duplicateVotingAllowed: true,
+      options: ['Red', 'Blue'],
+    }
+    setupApi([], [], ninjaCampaign, [question])
+    render(<App campaignId="ninja-naming" />)
+
+    const redVotes = await screen.findByRole('spinbutton', { name: /red votes/i })
+    expect(screen.getByText('Submit 3 votes, multiple votes per answer allowed')).toBeInTheDocument()
+    const options = document.querySelector('.question-response__options')
+    expect(options?.querySelectorAll('li')).toHaveLength(2)
+    expect(options?.querySelector('.question-response__option--votes input')).toBe(redVotes)
+    fireEvent.change(redVotes, { target: { value: '2' } })
+    await userEvent.click(screen.getByRole('button', { name: /submit answer/i }))
+
+    await waitFor(() => expect(mockPostQuestionResponse).toHaveBeenCalledWith(
+      'ninja-naming',
+      'color',
+      ['Red', 'Red'],
+      expect.stringMatching(/^[0-9a-f-]{36}$/i),
+    ))
+  })
+
+  it('shows the selection limit when repeated categorical votes are disabled', async () => {
+    const question: Question = {
+      id: 'color',
+      campaignId: 'ninja-naming',
+      title: 'Favorite color?',
+      description: '',
+      sortOrder: 1,
+      questionType: 'categorical',
+      allowSuggestions: false,
+      numberOfVotes: 3,
+      duplicateVotingAllowed: false,
+      options: ['Red', 'Blue', 'Green'],
+    }
+    setupApi([], [], ninjaCampaign, [question])
+    render(<App campaignId="ninja-naming" />)
+
+    expect(await screen.findByText('Select up to 3 options')).toBeInTheDocument()
+    expect(screen.queryByText(/multiple votes per answer allowed/i)).not.toBeInTheDocument()
+  })
+
+  it('renders only questions with active status', async () => {
+    const questions: Question[] = [
+      {
+        id: 'active-question',
+        campaignId: 'ninja-naming',
+        title: 'Active question',
+        description: '',
+        status: 'active',
+        sortOrder: 1,
+        questionType: 'categorical',
+        allowSuggestions: false,
+        options: ['Yes', 'No'],
+      },
+      {
+        id: 'draft-question',
+        campaignId: 'ninja-naming',
+        title: 'Draft question',
+        description: '',
+        status: 'draft',
+        sortOrder: 2,
+        questionType: 'categorical',
+        allowSuggestions: false,
+        options: ['Yes', 'No'],
+      },
+      {
+        id: 'unspecified-question',
+        campaignId: 'ninja-naming',
+        title: 'Unspecified question',
+        description: '',
+        sortOrder: 3,
+        questionType: 'categorical',
+        allowSuggestions: false,
+        options: ['Yes', 'No'],
+      },
+    ]
+    setupApi([], [], ninjaCampaign, questions)
+    mockFetchQuestions.mockResolvedValue(questions)
+    render(<App campaignId="ninja-naming" />)
+
+    expect(await screen.findByRole('region', { name: 'Active question' })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Draft question' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Unspecified question' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Draft question')).not.toBeInTheDocument()
+    expect(screen.queryByText('Unspecified question')).not.toBeInTheDocument()
+  })
+
+  it('does not show voting controls for text questions with voting disabled', async () => {
+    const question: Question = {
+      ...ninjaQuestions[0],
+      numberOfVotes: 0,
+      duplicateVotingAllowed: false,
+    }
+    setupApi([{ ...testSuggestion }], [], ninjaCampaign, [question])
+    render(<App campaignId="ninja-naming" />)
+
+    await screen.findAllByText('Rocket')
+    expect(screen.queryByRole('button', { name: /vote for rocket/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('complementary', { name: /voting rules/i })).not.toBeInTheDocument()
+  })
+
+  it('shows independent answering controls for every question', async () => {
+    const questions: Question[] = [
+      {
+        id: 'color',
+        campaignId: 'ninja-naming',
+        title: 'Favorite color?',
+        description: '',
+        sortOrder: 1,
+        questionType: 'categorical',
+        allowSuggestions: false,
+        options: ['Red', 'Blue'],
+      },
+      {
+        id: 'animal',
+        campaignId: 'ninja-naming',
+        title: 'Favorite animal?',
+        description: '',
+        sortOrder: 2,
+        questionType: 'categorical',
+        allowSuggestions: false,
+        options: ['Cat', 'Dog'],
+      },
+    ]
+    setupApi([], [], ninjaCampaign, questions)
+    render(<App campaignId="ninja-naming" />)
+
+    await userEvent.click(await screen.findByRole('radio', { name: 'Blue' }))
+    await userEvent.click(screen.getByRole('radio', { name: 'Cat' }))
+
+    expect(screen.getByRole('radio', { name: 'Blue' })).toBeChecked()
+    expect(screen.getByRole('radio', { name: 'Cat' })).toBeChecked()
+    expect(screen.getByRole('radio', { name: 'Dog' })).not.toBeChecked()
+
+    const questionSections = screen.getAllByRole('region')
+    const colorSection = questionSections.find((section) => section.getAttribute('aria-label') === 'Favorite color?')
+    const animalSection = questionSections.find((section) => section.getAttribute('aria-label') === 'Favorite animal?')
+    expect(colorSection).toBeDefined()
+    expect(animalSection).toBeDefined()
+    await userEvent.click(within(colorSection!).getByRole('button', { name: /submit answer/i }))
+    await userEvent.click(within(animalSection!).getByRole('button', { name: /submit answer/i }))
+    expect(mockPostQuestionResponse).toHaveBeenNthCalledWith(
+      1,
+      'ninja-naming',
+      'color',
+      ['Blue'],
+      expect.stringMatching(/^[0-9a-f-]{36}$/i),
+    )
+    expect(mockPostQuestionResponse).toHaveBeenNthCalledWith(
+      2,
+      'ninja-naming',
+      'animal',
+      ['Cat'],
+      expect.stringMatching(/^[0-9a-f-]{36}$/i),
+    )
   })
 })
 
@@ -1161,14 +1401,13 @@ describe('maxVotesPerCandidate', () => {
     description: 'Vote for the best padeller.',
     status: 'active',
     createdAt: '2024-01-01T00:00:00.000Z',
-    allowSuggestions: true,
     maxVotesTotal: 3,
     maxVotesPerCategory: 3,
     maxVotesPerCandidate: 2,
   }
 
   const multiVoteQuestions: Question[] = [
-    { id: 'nominees', campaignId: 'best-padeller-2026', title: 'Nominees', description: 'desc', sortOrder: 1 },
+    { id: 'nominees', campaignId: 'best-padeller-2026', title: 'Nominees', description: 'desc', status: 'active', sortOrder: 1, questionType: 'text', allowSuggestions: true, numberOfVotes: 3, duplicateVotingAllowed: true },
   ]
 
   const alice: Suggestion = {
@@ -1330,7 +1569,7 @@ describe('maxVotesPerCandidate', () => {
 describe('empty imageUrl', () => {
   it('renders question cards without a broken image when imageUrl is empty', async () => {
     const questionsWithoutImage: Question[] = [
-      { id: 'q-1', campaignId: 'ninja-naming', title: 'Ninja Without Image', description: 'desc', sortOrder: 1 },
+      { id: 'q-1', campaignId: 'ninja-naming', title: 'Ninja Without Image', description: 'desc', sortOrder: 1, questionType: 'text', allowSuggestions: true, numberOfVotes: 1, duplicateVotingAllowed: false },
     ]
     setupApi([], [], ninjaCampaign, questionsWithoutImage)
     render(<App campaignId="ninja-naming" />)

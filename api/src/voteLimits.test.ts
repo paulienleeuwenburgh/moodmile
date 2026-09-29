@@ -6,7 +6,6 @@ const campaign = {
   title: 'Test',
   description: '',
   status: 'active',
-  allowSuggestions: true,
   maxVotesTotal: 3,
   maxVotesPerCategory: 0,
   maxVotesPerCandidate: 2,
@@ -36,14 +35,31 @@ describe('filterVoteRecordsByActiveSuggestions', () => {
 describe('canCastVote with active vote filtering', () => {
   it('allows a vote after soft delete releases preserved votes', () => {
     const activeVotes = filterVoteRecordsByActiveSuggestions(allVotes, new Set(['rogier']))
-    expect(canCastVote(campaign, activeVotes, 'q-1', 'rogier')).toEqual({ allowed: true })
+    expect(canCastVote(campaign, activeVotes, 'q-1', 'rogier', 5, true)).toEqual({ allowed: true })
   })
 
   it('blocks a vote again after restore re-activates preserved votes', () => {
     const activeVotes = filterVoteRecordsByActiveSuggestions(allVotes, new Set(['marja', 'rogier']))
-    expect(canCastVote(campaign, activeVotes, 'q-1', 'rogier')).toEqual({
+    expect(canCastVote(campaign, activeVotes, 'q-1', 'rogier', 5, true)).toEqual({
       allowed: false,
       error: 'You have reached the maximum of 3 total vote(s) for this campaign',
+    })
+
+  })
+
+  it('enforces question vote budgets and disallows duplicate candidate votes when configured', () => {
+    expect(canCastVote(campaign, [
+      { questionId: 'q-1', suggestionId: 'marja' },
+    ], 'q-1', 'marja', 3, false)).toEqual({
+      allowed: false,
+      error: 'You have already cast the maximum of 1 vote(s) for this candidate',
+    })
+    expect(canCastVote(campaign, [
+      { questionId: 'q-1', suggestionId: 'marja' },
+      { questionId: 'q-1', suggestionId: 'rogier' },
+    ], 'q-1', 'new', 2, true)).toEqual({
+      allowed: false,
+      error: 'You have reached the maximum of 2 vote(s) for this category',
     })
   })
 })

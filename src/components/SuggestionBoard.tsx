@@ -1,8 +1,7 @@
-import type { Campaign, Question, Suggestion } from '../types'
+import type { Question, Suggestion } from '../types'
 import { handleImageError } from '../utils/imageError'
 
 interface SuggestionBoardProps {
-  campaign: Campaign
   questions: Question[]
   suggestions: Suggestion[]
   voteCountById: Map<string, number>
@@ -11,22 +10,18 @@ interface SuggestionBoardProps {
 }
 
 export function SuggestionBoard({
-  campaign,
   questions,
   suggestions,
   voteCountById,
   onVote,
   isVoteDisabled,
 }: SuggestionBoardProps) {
-  const usesSingleVoteButton = campaign.maxVotesPerCandidate === 1
   const hasMultipleQuestions = questions.length > 1
   const showQuestionImages = hasMultipleQuestions
-  const boardTitle = campaign.allowSuggestions ? 'Suggestions by question' : 'Submissions by question'
+  const boardTitle = 'Suggestions by question'
   const boardLabel = hasMultipleQuestions
     ? boardTitle
-    : campaign.allowSuggestions
-      ? 'Suggestions'
-      : 'Submissions'
+    : 'Suggestions'
 
   return (
     <section className="suggestion-board" aria-label={boardLabel}>
@@ -37,6 +32,7 @@ export function SuggestionBoard({
           const questionSuggestions = suggestions
             .filter((suggestion) => suggestion.questionId === question.id)
             .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+          const usesSingleVoteButton = !question.duplicateVotingAllowed
 
           return (
             <article key={question.id} className="suggestion-group">
@@ -60,9 +56,9 @@ export function SuggestionBoard({
                     <path d="M5.5 3L8 1l2.5 2" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
                     <path d="M8 1v5" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
                   </svg>
-                  {campaign.allowSuggestions
-                    ? 'No submissions yet — be the first!'
-                    : 'Submissions are closed for this question.'}
+                  {question.allowSuggestions
+                    ? 'No suggestions yet — be the first!'
+                    : 'Suggestions are closed for this question.'}
                 </p>
               ) : (
                 <ul>
@@ -74,7 +70,7 @@ export function SuggestionBoard({
                     return (
                       <li key={suggestion.id} className="suggestion-card">
                         <span className="suggestion-card__name">{suggestion.name}</span>
-                        <div className="vote-actions">
+                        {(question.numberOfVotes ?? 0) > 0 ? <div className="vote-actions">
                           <button
                             type="button"
                             className={`vote-btn${usesSingleVoteButton && hasVotes ? ' vote-btn--voted' : ''}`}
@@ -100,7 +96,7 @@ export function SuggestionBoard({
                               <span className="vote-btn__icon" aria-hidden="true">−</span>
                             </button>
                           )}
-                        </div>
+                        </div> : <span className="vote-btn__count">{suggestion.votes}</span>}
                       </li>
                     )
                   })}

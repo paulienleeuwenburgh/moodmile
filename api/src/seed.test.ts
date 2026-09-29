@@ -82,7 +82,7 @@ describe('seedDefaultCampaign', () => {
     const [campaignEntity] = mockUpsertEntity.mock.calls[0]
     expect(campaignEntity.partitionKey).toBe('campaign')
     expect(campaignEntity.status).toBe('active')
-    expect(campaignEntity.allowSuggestions).toBe(true)
+    expect(campaignEntity).not.toHaveProperty('allowSuggestions')
     expect(campaignEntity.maxVotesPerCategory).toBe(1)
     expect(campaignEntity.maxVotesPerCandidate).toBe(1)
   })
@@ -97,5 +97,8 @@ describe('seedDefaultCampaign', () => {
     expect(imageUrls).toContain('/mascots/ninja2.png')
     expect(imageUrls).toContain('/mascots/ninja3.png')
     expect(imageUrls).toContain('/mascots/ninja4.png')
+    const questions = mockQuestionsUpsert.mock.calls.map((args: unknown[]) => args[0] as { questionType: string; status: string; allowSuggestions: boolean; numberOfVotes: number; duplicateVotingAllowed: boolean })
+    expect(questions.every((question) => question.questionType === 'text' && question.allowSuggestions && question.numberOfVotes === 1 && !question.duplicateVotingAllowed)).toBe(true)
+    expect(questions.every((question) => question.status === 'active')).toBe(true)
   })
 })

@@ -6,9 +6,9 @@ export function countSuggestionCharacters(value: string): number {
   return Array.from(value).length
 }
 
-export function validateSuggestion(value: string): string {
-  if (countSuggestionCharacters(value) > SUGGESTION_MAX_LENGTH) {
-    return `Answers can be up to ${SUGGESTION_MAX_LENGTH} characters long.`
+export function validateSuggestion(value: string, maxLength = SUGGESTION_MAX_LENGTH): string {
+  if (countSuggestionCharacters(value) > maxLength) {
+    return `Answers can be up to ${maxLength} characters long.`
   }
 
   if (INVALID_MARKUP_REGEX.test(value)) {

@@ -59,7 +59,6 @@ describe('AdminPage document title', () => {
       description: 'Vote for the best padeller.',
       status: 'active',
       createdAt: '2024-01-01T00:00:00.000Z',
-      allowSuggestions: false,
       maxVotesTotal: 3,
       maxVotesPerCategory: 3,
       maxVotesPerCandidate: 2,
@@ -71,6 +70,10 @@ describe('AdminPage document title', () => {
         title: 'Who do you nominate?',
         description: 'Vote for the best padeller.',
         sortOrder: 1,
+        questionType: 'text',
+        allowSuggestions: true,
+        numberOfVotes: 1,
+        duplicateVotingAllowed: false,
       },
     ])
     mockFetchSuggestions.mockResolvedValue([])

@@ -5,7 +5,6 @@ export interface Campaign {
   status: string
   createdAt: string
   updatedAt?: string
-  allowSuggestions: boolean
   /** Maximum votes a user may cast across the entire campaign. 0 = unlimited. */
   maxVotesTotal: number
   /** Maximum votes a user may cast within a single category (question). 0 = unlimited. */
@@ -20,15 +19,38 @@ export interface Campaign {
   bannerImageUrl?: string
 }
 
+export type QuestionType =
+  | 'categorical'
+  | 'boolean'
+  | 'ordinal'
+  | 'numeric'
+  | 'text'
+
 export interface Question {
   id: string
   campaignId: string
   title: string
   description: string
+  status?: string
+  questionType: QuestionType
+  allowSuggestions: boolean
+  required?: boolean
+  maxSize?: number
+  numberOfVotes?: number
+  duplicateVotingAllowed?: boolean
+  options?: string[]
+  numericMin?: number
+  numericMax?: number
   imageUrl?: string
   sortOrder: number
   createdAt?: string
   updatedAt?: string
+}
+
+export interface QuestionResponse {
+  questionId: string
+  answer: string | string[] | boolean | number
+  count: number
 }
 
 export interface Suggestion {

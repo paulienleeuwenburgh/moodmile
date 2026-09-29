@@ -10,7 +10,6 @@ const campaign: Campaign = {
   description: 'Description',
   status: 'active',
   createdAt: '2024-01-01T00:00:00.000Z',
-  allowSuggestions: false,
   maxVotesTotal: 1,
   maxVotesPerCategory: 1,
   maxVotesPerCandidate: 1,
@@ -24,6 +23,10 @@ function createQuestion(id: string): Question {
     campaignId: campaign.id,
     title: `Question ${id}`,
     description: 'Description',
+    questionType: 'text',
+    allowSuggestions: true,
+    numberOfVotes: 1,
+    duplicateVotingAllowed: false,
     imageUrl: `/images/${id}.png`,
     sortOrder: 1,
   }
@@ -45,7 +48,6 @@ describe('question image display', () => {
     const question = createQuestion('question-1')
     const { container } = render(
       <SuggestionBoard
-        campaign={campaign}
         questions={[question]}
         suggestions={[createSuggestion(question.id)]}
         voteCountById={new Map()}
@@ -61,7 +63,6 @@ describe('question image display', () => {
     const secondQuestion = createQuestion('question-2')
     const { container } = render(
       <SuggestionBoard
-        campaign={campaign}
         questions={[firstQuestion, secondQuestion]}
         suggestions={[createSuggestion(firstQuestion.id), createSuggestion(secondQuestion.id)]}
         voteCountById={new Map()}
@@ -76,7 +77,6 @@ describe('question image display', () => {
     const question = createQuestion('question-1')
     const { container } = render(
       <Leaderboard
-        campaign={campaign}
         questions={[question]}
         suggestions={[createSuggestion(question.id)]}
         voteCountById={new Map()}
@@ -93,7 +93,6 @@ describe('question image display', () => {
     const secondQuestion = createQuestion('question-2')
     const { container } = render(
       <Leaderboard
-        campaign={campaign}
         questions={[firstQuestion, secondQuestion]}
         suggestions={[createSuggestion(firstQuestion.id), createSuggestion(secondQuestion.id)]}
         voteCountById={new Map()}

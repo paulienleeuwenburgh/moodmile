@@ -1,4 +1,5 @@
 import { TableClient, AzureNamedKeyCredential, TableEntityResult, RestError } from '@azure/data-tables'
+import type { QuestionType } from './responseValidation'
 
 const ensuredTables = new Set<string>()
 
@@ -71,7 +72,6 @@ export interface CampaignEntity {
   title: string
   description: string
   status: string       // 'draft' | 'active' | 'closed'
-  allowSuggestions: boolean
   maxVotesTotal: number
   maxVotesPerCategory: number
   maxVotesPerCandidate: number
@@ -97,10 +97,47 @@ export interface QuestionEntity {
   rowKey: string       // questionId
   title: string
   description: string
+  status?: string
+  questionType: string
+  allowSuggestions?: boolean
+  required?: boolean
+  maxSize?: number
+  numberOfVotes?: number
+  duplicateVotingAllowed?: boolean
+  options?: string
+  numericMin?: number
+  numericMax?: number
   imageUrl?: string
   sortOrder: number
   createdAt: string
   updatedAt: string
+}
+
+function normalizeQuestionType(value: string): QuestionType | string {
+  const normalized = value.trim().toLocaleLowerCase()
+  const supportedType = ['categorical', 'boolean', 'ordinal', 'numeric', 'text']
+    .find((type) => type === normalized)
+  return supportedType ?? value
+}
+
+function normalizeBoolean(value: unknown, defaultValue: boolean): boolean {
+  if (value === undefined) return defaultValue
+  if (typeof value === 'boolean') return value
+  if (typeof value === 'string') {
+    if (value.trim().toLocaleLowerCase() === 'true') return true
+    if (value.trim().toLocaleLowerCase() === 'false') return false
+  }
+  return value as boolean
+}
+
+function normalizeNumber(value: unknown, defaultValue?: number): number | undefined {
+  if (value === undefined) return defaultValue
+  if (typeof value === 'number') return value
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return value as number
 }
 
 export function getCampaignsClient(): TableClient {
@@ -117,7 +154,6 @@ export function entityToCampaignConfig(entity: TableEntityResult<CampaignEntity>
     title: entity.title,
     description: entity.description,
     status: entity.status,
-    allowSuggestions: entity.allowSuggestions,
     maxVotesTotal: entity.maxVotesTotal,
     maxVotesPerCategory: entity.maxVotesPerCategory,
     maxVotesPerCandidate: entity.maxVotesPerCandidate,
@@ -128,11 +164,37 @@ export function entityToCampaignConfig(entity: TableEntityResult<CampaignEntity>
 }
 
 export function entityToQuestion(entity: TableEntityResult<QuestionEntity>) {
+  const questionType = normalizeQuestionType(entity.questionType) as QuestionType
+  let options: string[] | undefined
+  if (typeof entity.options === 'string') {
+    try {
+      const parsed: unknown = JSON.parse(entity.options)
+      if (Array.isArray(parsed) && parsed.every((option) => typeof option === 'string')) {
+        options = parsed
+      }
+    } catch {
+      options = undefined
+    }
+  }
   return {
     id: entity.rowKey as string,
     campaignId: entity.partitionKey as string,
     title: entity.title,
     description: entity.description,
+    status: entity.status,
+    questionType,
+    allowSuggestions: questionType === 'text' ? normalizeBoolean(entity.allowSuggestions, true) : false,
+    required: normalizeBoolean(entity.required, false),
+    maxSize: questionType === 'text' ? normalizeNumber(entity.maxSize, 250) : undefined,
+    numberOfVotes: questionType === 'text' ? normalizeNumber(entity.numberOfVotes, 0)
+      : questionType === 'categorical' ? normalizeNumber(entity.numberOfVotes, 1)
+        : undefined,
+    duplicateVotingAllowed: questionType === 'text' || questionType === 'categorical'
+      ? normalizeBoolean(entity.duplicateVotingAllowed, false)
+      : undefined,
+    options,
+    numericMin: normalizeNumber(entity.numericMin),
+    numericMax: normalizeNumber(entity.numericMax),
     imageUrl: entity.imageUrl,
     sortOrder: entity.sortOrder,
     createdAt: entity.createdAt,
@@ -184,12 +246,25 @@ export interface VoteEntity {
   createdAt: string
 }
 
+export interface QuestionResponseEntity {
+  partitionKey: string // "{campaignId}|{questionId}"
+  rowKey: string // sessionId
+  campaignId: string
+  questionId: string
+  answer: string // JSON-serialized string, string[], boolean, or number
+  createdAt: string
+}
+
 export function getSuggestionsClient(): TableClient {
   return getTableClient('suggestions')
 }
 
 export function getVotesClient(): TableClient {
   return getTableClient('votes')
+}
+
+export function getQuestionResponsesClient(): TableClient {
+  return getTableClient('questionResponses')
 }
 
 export function entityToSuggestion(entity: TableEntityResult<SuggestionEntity>) {

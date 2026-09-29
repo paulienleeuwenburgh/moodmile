@@ -52,7 +52,7 @@
  *     Downloads either:
  *       - a JSON export containing campaign metadata, questions, all submissions
  *         (active and deleted), summary metrics, and all vote rows; or
- *       - a CSV export containing all submissions only.
+ *       - a CSV export containing text suggestions and structured responses.
  *
  *   GET /api/mgmt/campaigns/{campaignId}/summary
  *     Returns admin-only campaign summary metrics including unique submission
@@ -67,7 +67,9 @@ import {
   getQuestionsClient,
   getSuggestionsClient,
   getVotesClient,
+  getQuestionResponsesClient,
   QuestionEntity,
+  QuestionResponseEntity,
   SuggestionEntity,
   VoteEntity,
   suggestionPartitionKey,
@@ -102,6 +104,16 @@ interface AdminVoteExport {
   sessionId: string
   createdAt: string
   isDeletedSuggestion: boolean
+}
+
+interface AdminResponseExport {
+  campaignId: string
+  questionId: string
+  questionTitle: string
+  questionType: string
+  answer: unknown
+  sessionId: string
+  createdAt: string
 }
 
 interface AdminCampaignSummary {
@@ -238,7 +250,7 @@ function escapeCsvValue(value: unknown): string {
   return stringValue
 }
 
-function buildSubmissionsCsv(submissions: AdminSubmissionExport[]): string {
+function buildSubmissionsCsv(submissions: AdminSubmissionExport[], responses: AdminResponseExport[]): string {
   const headers = [
     'campaignId',
     'questionId',
@@ -253,6 +265,8 @@ function buildSubmissionsCsv(submissions: AdminSubmissionExport[]): string {
     'deletedBy',
     'deleteReason',
     'imageUrl',
+    'submissionType',
+    'answer',
   ]
   const rows = submissions.map((submission) => [
     submission.campaignId,
@@ -268,8 +282,27 @@ function buildSubmissionsCsv(submissions: AdminSubmissionExport[]): string {
     submission.deletedBy ?? '',
     submission.deleteReason ?? '',
     submission.imageUrl ?? '',
+    'text suggestion',
+    submission.name,
   ])
-  return [headers, ...rows].map((row) => row.map((value) => escapeCsvValue(value)).join(',')).join('\n')
+  const responseRows = responses.map((response) => [
+    response.campaignId,
+    response.questionId,
+    response.questionTitle,
+    '',
+    '',
+    response.createdAt,
+    '',
+    response.sessionId,
+    false,
+    '',
+    '',
+    '',
+    '',
+    response.questionType,
+    JSON.stringify(response.answer),
+  ])
+  return [headers, ...rows, ...responseRows].map((row) => row.map((value) => escapeCsvValue(value)).join(',')).join('\n')
 }
 
 async function collectCampaignAdminData(campaignId: string) {
@@ -281,10 +314,12 @@ async function collectCampaignAdminData(campaignId: string) {
   const questionsClient = getQuestionsClient()
   const suggestionsClient = getSuggestionsClient()
   const votesClient = getVotesClient()
+  const responsesClient = getQuestionResponsesClient()
   await Promise.all([
     ensureTableExists(questionsClient),
     ensureTableExists(suggestionsClient),
     ensureTableExists(votesClient),
+    ensureTableExists(responsesClient),
   ])
 
   const questions: ReturnType<typeof entityToQuestion>[] = []
@@ -321,6 +356,28 @@ async function collectCampaignAdminData(campaignId: string) {
   }
   submissions.sort((a, b) => a.questionId.localeCompare(b.questionId) || a.name.localeCompare(b.name))
 
+  const responses: AdminResponseExport[] = []
+  for await (const entity of responsesClient.listEntities<QuestionResponseEntity>({
+    queryOptions: { filter: `PartitionKey ge '${escapeODataString(campaignId)}|' and PartitionKey lt '${escapeODataString(campaignId)}~'` },
+  })) {
+    let answer: unknown
+    try {
+      answer = JSON.parse(entity.answer)
+    } catch {
+      answer = entity.answer
+    }
+    const question = questions.find((item) => item.id === entity.questionId)
+    responses.push({
+      campaignId,
+      questionId: entity.questionId,
+      questionTitle: question?.title ?? entity.questionId,
+      questionType: question?.questionType ?? 'text',
+      answer,
+      sessionId: String(entity.rowKey ?? ''),
+      createdAt: entity.createdAt,
+    })
+  }
+
   const voteFilter = `PartitionKey ge '${escapeODataString(campaignId)}|' and PartitionKey lt '${escapeODataString(campaignId)}~'`
   const votes: AdminVoteExport[] = []
   for await (const entity of votesClient.listEntities<VoteEntity>({
@@ -348,11 +405,14 @@ async function collectCampaignAdminData(campaignId: string) {
   )
 
   const summary: AdminCampaignSummary = {
-    uniqueSubmissionDevices: countUniqueValues(submissions.map((submission) => submission.sessionId)),
+    uniqueSubmissionDevices: countUniqueValues([
+      ...submissions.map((submission) => submission.sessionId),
+      ...responses.map((response) => response.sessionId),
+    ]),
     uniqueVotingDevices: countUniqueValues(votes.map((vote) => vote.sessionId)),
   }
 
-  return { campaign, questions, submissions, votes, summary }
+  return { campaign, questions, submissions, responses, votes, summary }
 }
 
 export async function getCampaignSummary(
@@ -408,7 +468,7 @@ export async function exportCampaignData(
   if (format === 'csv') {
     return {
       status: 200,
-      body: buildSubmissionsCsv(data.submissions),
+      body: buildSubmissionsCsv(data.submissions, data.responses),
       headers: {
         'Content-Type': 'text/csv; charset=utf-8',
         'Content-Disposition': `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
@@ -425,6 +485,7 @@ export async function exportCampaignData(
         summary: data.summary,
         questions: data.questions,
         submissions: data.submissions,
+        responses: data.responses,
         votes: data.votes,
       },
       null,
@@ -536,6 +597,7 @@ async function resetCampaignSuggestions(
   // Soft-delete all suggestions, then remove all votes.
   await doSoftDeleteAllSuggestions(campaignId)
   await doResetVotes(campaignId)
+  await doResetResponses(campaignId)
   return { status: 200, jsonBody: { success: true } }
 }
 
@@ -555,6 +617,7 @@ async function fullCampaignReset(
 
   await doSoftDeleteAllSuggestions(campaignId)
   await doResetVotes(campaignId)
+  await doResetResponses(campaignId)
   return { status: 200, jsonBody: { success: true } }
 }
 
@@ -628,6 +691,17 @@ async function doSoftDeleteAllSuggestions(campaignId: string): Promise<void> {
       'Merge',
     ),
   )
+}
+
+async function doResetResponses(campaignId: string): Promise<void> {
+  const client = getQuestionResponsesClient()
+  await ensureTableExists(client)
+  const filter = `PartitionKey ge '${escapeODataString(campaignId)}|' and PartitionKey lt '${escapeODataString(campaignId)}~'`
+  const rows: { partitionKey: string; rowKey: string }[] = []
+  for await (const entity of client.listEntities<QuestionResponseEntity>({ queryOptions: { filter } })) {
+    rows.push({ partitionKey: String(entity.partitionKey), rowKey: String(entity.rowKey) })
+  }
+  await processBatches(rows, (item) => client.deleteEntity(item.partitionKey, item.rowKey))
 }
 
 /**

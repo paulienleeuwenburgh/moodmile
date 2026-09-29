@@ -4,14 +4,17 @@ import {
   ensureTableExists,
   entityToCampaignConfig,
   type CampaignEntity,
+  entityToQuestion,
+  getQuestionsClient,
+  type QuestionEntity,
 } from './tableClient'
+import { validateQuestion } from './responseValidation'
 
 export interface CampaignConfig {
   id: string
   title: string
   description: string
   status: string
-  allowSuggestions: boolean
   /** Maximum votes a user may cast across the entire campaign. 0 = unlimited. */
   maxVotesTotal: number
   /** Maximum votes a user may cast within a single category (question). 0 = unlimited. */
@@ -20,6 +23,25 @@ export interface CampaignConfig {
   maxVotesPerCandidate: number
   /** Optional hero/banner image URL. */
   bannerImageUrl?: string
+}
+
+export async function getQuestionConfig(campaignId: string, questionId: string) {
+  const [questionsClient, campaignsClient] = [getQuestionsClient(), getCampaignsClient()]
+  await Promise.all([ensureTableExists(questionsClient), ensureTableExists(campaignsClient)])
+  try {
+    const entity = await questionsClient.getEntity<QuestionEntity>(campaignId, questionId)
+    const question = entityToQuestion(entity)
+    const errors = validateQuestion(question)
+    if (errors.length > 0) {
+      throw new Error(`Invalid question configuration for "${questionId}": ${errors.join(' ')}`)
+    }
+    return question
+  } catch (err) {
+    if (err instanceof RestError && err.statusCode === 404) {
+      return undefined
+    }
+    throw err
+  }
 }
 
 /**
@@ -54,4 +76,3 @@ export async function getActiveCampaign(): Promise<CampaignConfig | undefined> {
   }
   return undefined
 }
-

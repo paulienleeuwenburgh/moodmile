@@ -238,13 +238,13 @@ export function AdminPage() {
     const activeCount = suggestions.length
     ask({
       title: 'Reset all candidates',
-      message: `Reset all candidates for "${campaign?.title}"?\n\nAffects: All ${activeCount} active candidate${activeCount !== 1 ? 's' : ''} will be soft-deleted. All votes will be permanently deleted.\n\nPreserved: Soft-deleted candidates are kept in storage and can be restored individually. Campaign settings are unchanged.\n\nVotes cannot be recovered after this action.`,
+      message: `Reset all candidates for "${campaign?.title}"?\n\nAffects: All ${activeCount} active candidate${activeCount !== 1 ? 's' : ''} will be soft-deleted. All votes and structured responses will be permanently deleted.\n\nPreserved: Soft-deleted candidates are kept in storage and can be restored individually. Campaign settings are unchanged.\n\nVotes and responses cannot be recovered after this action.`,
       confirmLabel: 'Reset candidates',
       onConfirm: async () => {
         setConfirm(null)
         try {
           await adminResetSuggestions(secret, campaignId)
-          showSuccess(`All ${activeCount} active candidate${activeCount !== 1 ? 's' : ''} have been soft-deleted and all votes removed. Candidates can be restored individually.`)
+          showSuccess(`All ${activeCount} active candidate${activeCount !== 1 ? 's' : ''} have been soft-deleted; votes and structured responses removed. Candidates can be restored individually.`)
           await refresh()
         } catch (err) {
           showError(getAdminErrorMessage(err, 'Candidate reset failed.'))
@@ -256,7 +256,7 @@ export function AdminPage() {
   async function handleFullReset() {
     ask({
       title: '⚠️ Full campaign reset',
-      message: `This is the most destructive action available for "${campaign?.title}".\n\nAffects: ALL votes will be permanently deleted. ALL active candidates will be soft-deleted.\n\nPreserved: Campaign settings (title, status, voting rules) are untouched. Soft-deleted candidates can be restored individually — votes cannot be recovered.\n\nTo confirm, type the campaign ID below.`,
+      message: `This is the most destructive action available for "${campaign?.title}".\n\nAffects: ALL votes and structured responses will be permanently deleted. ALL active candidates will be soft-deleted.\n\nPreserved: Campaign settings (title, status, voting rules) are untouched. Soft-deleted candidates can be restored individually — votes and responses cannot be recovered.\n\nTo confirm, type the campaign ID below.`,
       confirmText: campaignId,
       confirmLabel: 'Full reset',
       onConfirm: async () => {
@@ -264,7 +264,7 @@ export function AdminPage() {
         setConfirmInputValue('')
         try {
           await adminFullReset(secret, campaignId)
-          showSuccess(`Full reset complete for "${campaign?.title}". All votes deleted and all candidates soft-deleted. Campaign settings are preserved.`)
+          showSuccess(`Full reset complete for "${campaign?.title}". Votes and structured responses deleted; all candidates soft-deleted. Campaign settings are preserved.`)
           await refresh()
         } catch (err) {
           showError(getAdminErrorMessage(err, 'Full reset failed.'))
@@ -459,7 +459,7 @@ export function AdminPage() {
               </div>
               <div className="admin-action">
                 <strong>Reset candidates</strong>
-                <p><span className="admin-action__affects">Affects:</span> All {suggestions.length} active candidate{suggestions.length !== 1 ? 's' : ''} are soft-deleted. All votes are removed.</p>
+                <p><span className="admin-action__affects">Affects:</span> All {suggestions.length} active candidate{suggestions.length !== 1 ? 's' : ''} are soft-deleted. All votes and structured responses are removed.</p>
                 <p><span className="admin-action__preserves">Preserved:</span> Candidates are soft-deleted and restorable individually. Campaign settings unchanged.</p>
                 <button type="button" className="admin-btn admin-btn--danger" onClick={handleResetSuggestions}>
                   Reset candidates
@@ -467,7 +467,7 @@ export function AdminPage() {
               </div>
               <div className="admin-action admin-action--destructive">
                 <strong>⚠️ Full reset</strong>
-                <p><span className="admin-action__affects">Affects:</span> ALL votes deleted AND ALL active candidates soft-deleted.</p>
+                <p><span className="admin-action__affects">Affects:</span> ALL votes and structured responses deleted AND ALL active candidates soft-deleted.</p>
                 <p><span className="admin-action__preserves">Preserved:</span> Campaign settings only. Requires typing the campaign ID to confirm.</p>
                 <button type="button" className="admin-btn admin-btn--destructive" onClick={handleFullReset}>
                   Full reset

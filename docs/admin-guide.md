@@ -94,6 +94,7 @@ This gives the admin an at-a-glance picture of campaign state before taking any 
 ### Reset campaign candidates
 
 - **Affects:** All active (non-deleted) candidates are soft-deleted. All votes are also removed.
+- **Structured responses:** Answers to categorical, boolean, ordinal, and numeric questions are deleted.
 - **Preserved:** Campaign settings (title, status, voting rules) are unchanged. Soft-deleted candidates can be restored individually.
 - **Vote history:** Soft-deleted candidates retain their rows in storage. Vote rows are deleted.
 - **Reason for soft delete (not hard delete):** Keeping candidate rows means the suggestion IDs in historical vote rows remain resolvable. Hard-deleting candidates would leave orphaned vote row keys, making audit data unexplainable.
@@ -101,7 +102,7 @@ This gives the admin an at-a-glance picture of campaign state before taking any 
 
 ### Full campaign reset
 
-- **Affects:** All votes are deleted and all candidates are soft-deleted.
+- **Affects:** All votes and structured responses are deleted; all candidates are soft-deleted.
 - **Preserved:** Campaign configuration (title, status, and voting rules) is untouched.
 - **Safety requirement:** The admin must type the exact campaign ID in the confirmation dialog before the confirm button becomes active. This prevents accidental data loss.
 - **Confirmation dialog:** Prominently warns this is the most destructive operation available. Requires typing the campaign ID.
@@ -192,6 +193,10 @@ The admin panel maps API error codes to specific messages:
 
 All admin routes require the `X-Admin-Secret: <secret>` header.
 
+Campaign JSON and CSV exports include typed question configuration and all structured responses,
+alongside the existing text suggestions and vote records. Structured responses are also included
+when calculating unique submission devices.
+
 > **Note:** The route prefix `mgmt/` (not `admin/`) is used because Azure Functions reserves the
 > `admin/` prefix for its built-in host management API. Any HTTP trigger with a route starting
 > with `admin/` is intercepted by the Functions runtime and never reaches user-defined handlers.
@@ -202,8 +207,8 @@ All admin routes require the `X-Admin-Secret: <secret>` header.
 | `DELETE` | `/api/mgmt/suggestions` | Soft-delete a candidate (body: `{ campaignId, questionId, suggestionId, deletedBy?, deleteReason? }`) |
 | `POST` | `/api/mgmt/suggestions/restore` | Restore a soft-deleted candidate (body: `{ campaignId, questionId, suggestionId }`) |
 | `DELETE` | `/api/mgmt/campaigns/{campaignId}/votes` | Reset all votes for a campaign |
-| `DELETE` | `/api/mgmt/campaigns/{campaignId}/suggestions` | Soft-delete all candidates + reset votes |
-| `POST` | `/api/mgmt/campaigns/{campaignId}/reset` | Full reset (votes + soft-delete candidates) |
+| `DELETE` | `/api/mgmt/campaigns/{campaignId}/suggestions` | Soft-delete all candidates, reset votes, and delete structured responses |
+| `POST` | `/api/mgmt/campaigns/{campaignId}/reset` | Full reset (votes, structured responses, and soft-delete candidates) |
 
 ### Error responses
 

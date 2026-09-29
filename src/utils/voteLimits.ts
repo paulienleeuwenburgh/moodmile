@@ -1,4 +1,4 @@
-import type { Campaign, Suggestion } from '../types'
+import type { Campaign, Question, Suggestion } from '../types'
 
 interface VoteRecord {
   questionId: string
@@ -24,14 +24,25 @@ export function canCastVote(
   votes: VoteRecord[],
   questionId: string,
   suggestionId: string,
+  question?: Question,
 ): boolean {
+  const numberOfVotes = question?.numberOfVotes ?? Number.POSITIVE_INFINITY
+  const duplicateVotingAllowed = question?.duplicateVotingAllowed ?? true
+  if (question && numberOfVotes <= 0) {
+    return false
+  }
+
   const candidateVoteCount = votes.filter((vote) => vote.suggestionId === suggestionId).length
-  if (campaign.maxVotesPerCandidate > 0 && candidateVoteCount >= campaign.maxVotesPerCandidate) {
+  const maxVotesPerCandidate = duplicateVotingAllowed ? campaign.maxVotesPerCandidate : 1
+  if (maxVotesPerCandidate > 0 && candidateVoteCount >= maxVotesPerCandidate) {
     return false
   }
 
   const categoryVoteCount = votes.filter((vote) => vote.questionId === questionId).length
-  if (campaign.maxVotesPerCategory > 0 && categoryVoteCount >= campaign.maxVotesPerCategory) {
+  const maxVotesPerCategory = campaign.maxVotesPerCategory > 0
+    ? Math.min(campaign.maxVotesPerCategory, numberOfVotes)
+    : numberOfVotes
+  if (categoryVoteCount >= maxVotesPerCategory) {
     return false
   }
 
