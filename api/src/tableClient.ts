@@ -97,7 +97,7 @@ export interface QuestionEntity {
   rowKey: string       // questionId
   title: string
   description: string
-  questionType: QuestionType
+  questionType: string
   allowSuggestions?: boolean
   required?: boolean
   maxSize?: number
@@ -110,6 +110,33 @@ export interface QuestionEntity {
   sortOrder: number
   createdAt: string
   updatedAt: string
+}
+
+function normalizeQuestionType(value: string): QuestionType | string {
+  const normalized = value.trim().toLocaleLowerCase()
+  const supportedType = ['categorical', 'boolean', 'ordinal', 'numeric', 'text']
+    .find((type) => type === normalized)
+  return supportedType ?? value
+}
+
+function normalizeBoolean(value: unknown, defaultValue: boolean): boolean {
+  if (value === undefined) return defaultValue
+  if (typeof value === 'boolean') return value
+  if (typeof value === 'string') {
+    if (value.trim().toLocaleLowerCase() === 'true') return true
+    if (value.trim().toLocaleLowerCase() === 'false') return false
+  }
+  return value as boolean
+}
+
+function normalizeNumber(value: unknown, defaultValue?: number): number | undefined {
+  if (value === undefined) return defaultValue
+  if (typeof value === 'number') return value
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return value as number
 }
 
 export function getCampaignsClient(): TableClient {
@@ -136,7 +163,7 @@ export function entityToCampaignConfig(entity: TableEntityResult<CampaignEntity>
 }
 
 export function entityToQuestion(entity: TableEntityResult<QuestionEntity>) {
-  const questionType = entity.questionType
+  const questionType = normalizeQuestionType(entity.questionType) as QuestionType
   let options: string[] | undefined
   if (typeof entity.options === 'string') {
     try {
@@ -154,18 +181,18 @@ export function entityToQuestion(entity: TableEntityResult<QuestionEntity>) {
     title: entity.title,
     description: entity.description,
     questionType,
-    allowSuggestions: questionType === 'text' ? entity.allowSuggestions ?? true : false,
-    required: entity.required ?? false,
-    maxSize: questionType === 'text' ? entity.maxSize ?? 250 : undefined,
-    numberOfVotes: questionType === 'text' ? entity.numberOfVotes ?? 0
-      : questionType === 'categorical' ? entity.numberOfVotes ?? 1
+    allowSuggestions: questionType === 'text' ? normalizeBoolean(entity.allowSuggestions, true) : false,
+    required: normalizeBoolean(entity.required, false),
+    maxSize: questionType === 'text' ? normalizeNumber(entity.maxSize, 250) : undefined,
+    numberOfVotes: questionType === 'text' ? normalizeNumber(entity.numberOfVotes, 0)
+      : questionType === 'categorical' ? normalizeNumber(entity.numberOfVotes, 1)
         : undefined,
     duplicateVotingAllowed: questionType === 'text' || questionType === 'categorical'
-      ? entity.duplicateVotingAllowed ?? false
+      ? normalizeBoolean(entity.duplicateVotingAllowed, false)
       : undefined,
     options,
-    numericMin: entity.numericMin,
-    numericMax: entity.numericMax,
+    numericMin: normalizeNumber(entity.numericMin),
+    numericMax: normalizeNumber(entity.numericMax),
     imageUrl: entity.imageUrl,
     sortOrder: entity.sortOrder,
     createdAt: entity.createdAt,

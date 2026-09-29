@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { entityToQuestion, type QuestionEntity } from './tableClient'
+import { validateQuestion } from './responseValidation'
 
 function questionEntity(values: Partial<QuestionEntity> = {}) {
   return {
@@ -23,6 +24,7 @@ describe('entityToQuestion defaults', () => {
       numberOfVotes: 0,
       duplicateVotingAllowed: false,
     })
+    expect(validateQuestion(question)).toEqual([])
   })
 
   it('defaults Categorical to one selection with duplicates disabled', () => {
@@ -39,5 +41,30 @@ describe('entityToQuestion defaults', () => {
     const question = entityToQuestion(questionEntity({ questionType: 'boolean' }))
     expect(question.numberOfVotes).toBeUndefined()
     expect(question.duplicateVotingAllowed).toBeUndefined()
+  })
+
+  it('normalizes Azure title-case question types and string-valued scalar properties', () => {
+    const question = entityToQuestion(questionEntity({
+      questionType: 'Text',
+      allowSuggestions: 'true' as unknown as boolean,
+      required: 'true' as unknown as boolean,
+      maxSize: '80' as unknown as number,
+      numberOfVotes: '2' as unknown as number,
+      duplicateVotingAllowed: 'false' as unknown as boolean,
+    }))
+
+    expect(question).toMatchObject({
+      questionType: 'text',
+      allowSuggestions: true,
+      required: true,
+      maxSize: 80,
+      numberOfVotes: 2,
+      duplicateVotingAllowed: false,
+    })
+  })
+
+  it('normalizes categorical title casing while preserving unknown types for validation', () => {
+    expect(entityToQuestion(questionEntity({ questionType: 'Categorical' })).questionType).toBe('categorical')
+    expect(entityToQuestion(questionEntity({ questionType: 'unknown' })).questionType).toBe('unknown')
   })
 })
