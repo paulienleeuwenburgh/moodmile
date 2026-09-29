@@ -67,7 +67,7 @@ export function SuggestionForm({
           value={suggestion}
           onChange={(event) => handleChange(event.target.value)}
           placeholder="e.g. Sunny Stride"
-          required={selectedQuestion?.required}
+          required={question.required}
           aria-describedby={describedBy}
           aria-invalid={!!validationError}
         />

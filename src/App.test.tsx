@@ -431,7 +431,7 @@ describe('input validation', () => {
     setupApi()
     render(<App campaignId="ninja-naming" />)
     await screen.findAllByRole('textbox', { name: /your answer/i })
-    expect(screen.getByText('250 characters left')).toBeInTheDocument()
+    expect(screen.getAllByText('250 characters left')).toHaveLength(4)
     await typeInSuggestion('Good 😊')
     expect(screen.getByText('244 characters left')).toBeInTheDocument()
   })
