@@ -1,7 +1,8 @@
-import type { Question, Suggestion } from '../types'
+import type { Campaign, Question, Suggestion } from '../types'
 import { handleImageError } from '../utils/imageError'
 
 interface SuggestionBoardProps {
+  campaign: Campaign
   questions: Question[]
   suggestions: Suggestion[]
   voteCountById: Map<string, number>
@@ -10,6 +11,7 @@ interface SuggestionBoardProps {
 }
 
 export function SuggestionBoard({
+  campaign,
   questions,
   suggestions,
   voteCountById,

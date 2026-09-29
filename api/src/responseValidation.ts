@@ -64,8 +64,8 @@ export function validateQuestion(question: Partial<QuestionConfig>): string[] {
   if (question.questionType !== 'text' && question.allowVoting !== undefined) {
     errors.push('allowVoting is only supported for text questions.')
   }
-  if (question.allowVoting && !question.allowSuggestions) {
-    errors.push('allowVoting requires allowSuggestions to be enabled.')
+  if (question.allowVoting !== undefined && typeof question.allowVoting !== 'boolean') {
+    errors.push('allowVoting must be a boolean.')
   }
   if (typeof question.allowSuggestions !== 'boolean') {
     errors.push('allowSuggestions must be a boolean.')

@@ -123,7 +123,7 @@ async function postVote(
   if (!question) {
     return { status: 404, jsonBody: { error: 'Question not found' } }
   }
-  if (!revoke && (question.questionType !== 'text' || !question.allowVoting || !question.allowSuggestions)) {
+  if (!revoke && (question.questionType !== 'text' || !question.allowVoting)) {
     return { status: 403, jsonBody: { error: 'Voting is not enabled for this question' } }
   }
 

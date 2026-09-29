@@ -6,7 +6,6 @@ const campaign = {
   title: 'Test',
   description: '',
   status: 'active',
-  allowSuggestions: true,
   maxVotesTotal: 3,
   maxVotesPerCategory: 0,
   maxVotesPerCandidate: 2,

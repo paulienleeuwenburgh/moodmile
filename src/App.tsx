@@ -17,17 +17,6 @@ interface AppProps {
   campaignId: string
 }
 
-const handleQuestionResponseSubmit = async (question: Question, answer: QuestionResponse['answer']) => {
-  if (!campaign) return
-  try {
-    await postQuestionResponse(campaign.id, question.id, answer, getSessionId())
-    setQuestionResponses(await fetchQuestionResponses(campaign.id))
-    setActionError(null)
-  } catch (err) {
-    setActionError(err instanceof Error ? err.message : 'Failed to save your answer.')
-  }
-}
-
 const STALE_DATA_MESSAGE =
   "This candidate no longer exists. Your data may be out of date. Please click 'Refresh Data' to retrieve the latest information."
 const DUPLICATE_SUGGESTION_MESSAGE = 'That answer has already been submitted for this question.'
@@ -171,6 +160,17 @@ function App({ campaignId }: AppProps) {
       })
   }
 
+  const handleQuestionResponseSubmit = async (question: Question, answer: QuestionResponse['answer']) => {
+    if (!campaign) return
+    try {
+      await postQuestionResponse(campaign.id, question.id, answer, getSessionId())
+      setQuestionResponses(await fetchQuestionResponses(campaign.id))
+      setActionError(null)
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Failed to save your answer.')
+    }
+  }
+
   const handleVote = async (suggestionId: string, revoke: boolean) => {
     if (!campaign) return
     const currentCampaign = campaign
@@ -178,7 +178,7 @@ function App({ campaignId }: AppProps) {
     const suggestion = suggestions.find((s) => s.id === suggestionId)
     if (!suggestion) return
     const question = questions.find((item) => item.id === suggestion.questionId)
-    if (!question || question.questionType !== 'text' || !question.allowVoting || !question.allowSuggestions) return
+    if (!question || question.questionType !== 'text' || !question.allowVoting) return
 
     if (!revoke && !canCastVote(currentCampaign, voteRecords, suggestion.questionId, suggestion.id)) {
       return
@@ -237,7 +237,7 @@ function App({ campaignId }: AppProps) {
       return false
     }
     const question = questions.find((item) => item.id === suggestion.questionId)
-    if (!question || question.questionType !== 'text' || !question.allowVoting || !question.allowSuggestions) {
+    if (!question || question.questionType !== 'text' || !question.allowVoting) {
       return true
     }
     if (campaign.maxVotesPerCandidate === 1 && (voteCountById.get(suggestionId) ?? 0) > 0) {
@@ -284,7 +284,7 @@ function App({ campaignId }: AppProps) {
   const bannerImageUrl = campaign.bannerImageUrl?.trim()
   const showBanner = Boolean(bannerImageUrl && failedBannerUrl !== bannerImageUrl)
   const selectedQuestion = questions.find((question) => question.id === selectedQuestionId)
-  const suggestionQuestions = questions.filter((question) => question.questionType === 'text' && question.allowSuggestions)
+  const suggestionQuestions = questions.filter((question) => question.questionType === 'text')
   const votableQuestions = suggestionQuestions.filter((question) => question.allowVoting)
   const visibleSuggestions = suggestions.filter((suggestion) => votableQuestions.some((question) => question.id === suggestion.questionId))
   const answerResults = selectedQuestion
@@ -375,7 +375,7 @@ function App({ campaignId }: AppProps) {
         ))}
       </section>
 
-      {questions.some((question) => question.questionType === 'text' && question.allowVoting && question.allowSuggestions) && <VotingRules
+      {questions.some((question) => question.questionType === 'text' && question.allowVoting) && <VotingRules
         maxVotesTotal={campaign.maxVotesTotal}
         maxVotesPerCategory={campaign.maxVotesPerCategory}
         maxVotesPerCandidate={campaign.maxVotesPerCandidate}
@@ -418,6 +418,7 @@ function App({ campaignId }: AppProps) {
 
       {suggestionQuestions.length > 0 && (
         <SuggestionBoard
+          campaign={campaign}
           questions={suggestionQuestions}
           suggestions={suggestions.filter((suggestion) => suggestionQuestions.some((question) => question.id === suggestion.questionId))}
           voteCountById={voteCountById}

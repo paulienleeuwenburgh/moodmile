@@ -7,6 +7,7 @@ const {
   mockListQuestions,
   mockListSuggestions,
   mockListVotes,
+  mockListResponses,
 } = vi.hoisted(() => ({
   mockAppHttp: vi.fn(),
   mockEnsureTableExists: vi.fn(),
@@ -14,6 +15,7 @@ const {
   mockListQuestions: vi.fn(),
   mockListSuggestions: vi.fn(),
   mockListVotes: vi.fn(),
+  mockListResponses: vi.fn(),
 }))
 
 function toAsyncIterable<T>(items: T[]) {
@@ -41,6 +43,10 @@ vi.mock('./tableClient', () => ({
     description: entity.description,
     imageUrl: entity.imageUrl,
     sortOrder: entity.sortOrder,
+    questionType: entity.questionType,
+    allowSuggestions: entity.allowSuggestions,
+    allowVoting: entity.allowVoting,
+    options: entity.options,
     createdAt: entity.createdAt,
     updatedAt: entity.updatedAt,
   })),
@@ -65,6 +71,10 @@ vi.mock('./tableClient', () => ({
     listEntities: mockListVotes,
     tableName: 'votes',
   })),
+  getQuestionResponsesClient: vi.fn(() => ({
+    listEntities: mockListResponses,
+    tableName: 'questionResponses',
+  })),
   suggestionPartitionKey: vi.fn((campaignId: string, questionId: string) => `${campaignId}|${questionId}`),
 }))
 
@@ -81,6 +91,7 @@ describe('admin campaign export', () => {
     mockListQuestions.mockReset()
     mockListSuggestions.mockReset()
     mockListVotes.mockReset()
+    mockListResponses.mockReset()
     process.env.ADMIN_SECRET = 'secret'
     mockEnsureTableExists.mockResolvedValue(undefined)
     mockGetCampaign.mockResolvedValue({
@@ -88,7 +99,6 @@ describe('admin campaign export', () => {
       title: 'Best Padeller 2026',
       description: 'Vote for the best padeller.',
       status: 'active',
-      allowSuggestions: true,
       maxVotesTotal: 3,
       maxVotesPerCategory: 1,
       maxVotesPerCandidate: 1,
@@ -102,6 +112,9 @@ describe('admin campaign export', () => {
           title: 'Second category',
           description: 'Second',
           sortOrder: 2,
+          questionType: 'text',
+          allowSuggestions: true,
+          allowVoting: true,
           createdAt: '2026-01-02T00:00:00.000Z',
           updatedAt: '2026-01-02T00:00:00.000Z',
         },
@@ -111,6 +124,9 @@ describe('admin campaign export', () => {
           title: 'First category',
           description: 'First',
           sortOrder: 1,
+          questionType: 'text',
+          allowSuggestions: true,
+          allowVoting: true,
           createdAt: '2026-01-01T00:00:00.000Z',
           updatedAt: '2026-01-01T00:00:00.000Z',
         },
@@ -163,6 +179,15 @@ describe('admin campaign export', () => {
         },
       ]),
     )
+    mockListResponses.mockReturnValue(toAsyncIterable([
+      {
+        partitionKey: 'best-padeller-2026|q-1',
+        rowKey: 'session-c',
+        questionId: 'q-1',
+        answer: '5',
+        createdAt: '2026-02-03T00:00:00.000Z',
+      },
+    ]))
   })
 
   it('exports campaign metadata, submissions, and votes as a downloadable JSON file', async () => {
@@ -184,6 +209,7 @@ describe('admin campaign export', () => {
       summary: { uniqueSubmissionDevices: number; uniqueVotingDevices: number }
       questions: Array<{ id: string }>
       submissions: Array<{ id: string; questionTitle: string; isDeleted: boolean; deletedBy?: string; sessionId: string }>
+      responses: Array<{ questionId: string; questionType: string; answer: unknown; sessionId: string }>
       votes: Array<{ sessionId: string; suggestionName: string; isDeletedSuggestion: boolean }>
     }
 
@@ -193,7 +219,7 @@ describe('admin campaign export', () => {
     })
     expect(payload.questions.map((question) => question.id)).toEqual(['q-1', 'q-2'])
     expect(payload.summary).toEqual({
-      uniqueSubmissionDevices: 2,
+      uniqueSubmissionDevices: 3,
       uniqueVotingDevices: 2,
     })
     expect(payload.submissions).toEqual([
@@ -210,6 +236,9 @@ describe('admin campaign export', () => {
         deletedBy: 'Admin',
         sessionId: 'session-b',
       }),
+    ])
+    expect(payload.responses).toEqual([
+      expect.objectContaining({ questionId: 'q-1', questionType: 'text', answer: 5, sessionId: 'session-c' }),
     ])
     expect(payload.votes).toEqual([
       expect.objectContaining({
@@ -238,9 +267,10 @@ describe('admin campaign export', () => {
     expect(response.status).toBe(200)
     expect(response.headers['Content-Type']).toBe('text/csv; charset=utf-8')
     expect(response.headers['Content-Disposition']).toContain('.csv')
-    expect(String(response.body)).toContain('campaignId,questionId,questionTitle,submissionId,submissionName,createdAt,votes,submissionDeviceId,isDeleted,deletedAt,deletedBy,deleteReason,imageUrl')
-    expect(String(response.body)).toContain('best-padeller-2026,q-1,First category,s-1,Alex,2026-02-01T00:00:00.000Z,2,session-a,false,,,,')
-    expect(String(response.body)).toContain('best-padeller-2026,q-2,Second category,s-2,Casey,2026-02-02T00:00:00.000Z,1,session-b,true,2026-03-01T12:00:00.000Z,Admin,Duplicate,')
+    expect(String(response.body)).toContain('campaignId,questionId,questionTitle,submissionId,submissionName,createdAt,votes,submissionDeviceId,isDeleted,deletedAt,deletedBy,deleteReason,imageUrl,submissionType,answer')
+    expect(String(response.body)).toContain('best-padeller-2026,q-1,First category,s-1,Alex,2026-02-01T00:00:00.000Z,2,session-a,false,,,,,text suggestion,Alex')
+    expect(String(response.body)).toContain('best-padeller-2026,q-2,Second category,s-2,Casey,2026-02-02T00:00:00.000Z,1,session-b,true,2026-03-01T12:00:00.000Z,Admin,Duplicate,,text suggestion,Casey')
+    expect(String(response.body)).toContain('best-padeller-2026,q-1,First category,,,2026-02-03T00:00:00.000Z,,session-c,false,,,,,text,5')
   })
 
   it('returns unique device counts for the admin summary endpoint', async () => {
@@ -254,7 +284,7 @@ describe('admin campaign export', () => {
 
     expect(response.status).toBe(200)
     expect(response.jsonBody).toEqual({
-      uniqueSubmissionDevices: 2,
+      uniqueSubmissionDevices: 3,
       uniqueVotingDevices: 2,
     })
   })

@@ -6,7 +6,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
-import type { Campaign, Question, Suggestion } from './types'
+import type { Campaign, Question, QuestionResponse, Suggestion } from './types'
 
 const appStyles = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), 'App.css'), 'utf8')
 
@@ -17,6 +17,8 @@ const mockFetchCampaign = vi.fn<(campaignId: string) => Promise<Campaign>>()
 const mockFetchQuestions = vi.fn<(campaignId: string) => Promise<Question[]>>()
 const mockFetchSuggestions = vi.fn<(campaignId: string) => Promise<Suggestion[]>>()
 const mockFetchVoteCounts = vi.fn<(campaignId: string, sessionId: string) => Promise<Map<string, number>>>()
+const mockFetchQuestionResponses = vi.fn<(campaignId: string) => Promise<QuestionResponse[]>>()
+const mockPostQuestionResponse = vi.fn<(campaignId: string, questionId: string, answer: QuestionResponse['answer'], sessionId: string) => Promise<void>>()
 const mockPostSuggestion = vi.fn<
   (campaignId: string, questionId: string, name: string, sessionId: string) => Promise<Suggestion | null>
 >()
@@ -38,6 +40,8 @@ vi.mock('./api', () => ({
   fetchSuggestions: (...args: Parameters<typeof mockFetchSuggestions>) =>
     mockFetchSuggestions(...args),
   fetchVoteCounts: (...args: Parameters<typeof mockFetchVoteCounts>) => mockFetchVoteCounts(...args),
+  fetchQuestionResponses: (...args: Parameters<typeof mockFetchQuestionResponses>) => mockFetchQuestionResponses(...args),
+  postQuestionResponse: (...args: Parameters<typeof mockPostQuestionResponse>) => mockPostQuestionResponse(...args),
   postSuggestion: (...args: Parameters<typeof mockPostSuggestion>) => mockPostSuggestion(...args),
   postVote: (...args: Parameters<typeof mockPostVote>) => mockPostVote(...args),
 }))
@@ -52,17 +56,16 @@ const ninjaCampaign: Campaign = {
   description: 'Help us name our four ninja mascots by suggesting and voting for your favorites.',
   status: 'active',
   createdAt: '2024-01-01T00:00:00.000Z',
-  allowSuggestions: true,
   maxVotesTotal: 4,
   maxVotesPerCategory: 1,
   maxVotesPerCandidate: 1,
 }
 
 const ninjaQuestions: Question[] = [
-  { id: 'ninja-1', campaignId: 'ninja-naming', title: 'Ninja 1', description: 'This ninja needs a name.', imageUrl: '/mascots/ninja1.png', sortOrder: 1 },
-  { id: 'ninja-2', campaignId: 'ninja-naming', title: 'Ninja 2', description: 'This ninja needs a name.', imageUrl: '/mascots/ninja2.png', sortOrder: 2 },
-  { id: 'ninja-3', campaignId: 'ninja-naming', title: 'Ninja 3', description: 'This ninja needs a name.', imageUrl: '/mascots/ninja3.png', sortOrder: 3 },
-  { id: 'ninja-4', campaignId: 'ninja-naming', title: 'Ninja 4', description: 'This ninja needs a name.', imageUrl: '/mascots/ninja4.png', sortOrder: 4 },
+  { id: 'ninja-1', campaignId: 'ninja-naming', title: 'Ninja 1', description: 'This ninja needs a name.', imageUrl: '/mascots/ninja1.png', sortOrder: 1, questionType: 'text', allowSuggestions: true, allowVoting: true },
+  { id: 'ninja-2', campaignId: 'ninja-naming', title: 'Ninja 2', description: 'This ninja needs a name.', imageUrl: '/mascots/ninja2.png', sortOrder: 2, questionType: 'text', allowSuggestions: true, allowVoting: true },
+  { id: 'ninja-3', campaignId: 'ninja-naming', title: 'Ninja 3', description: 'This ninja needs a name.', imageUrl: '/mascots/ninja3.png', sortOrder: 3, questionType: 'text', allowSuggestions: true, allowVoting: true },
+  { id: 'ninja-4', campaignId: 'ninja-naming', title: 'Ninja 4', description: 'This ninja needs a name.', imageUrl: '/mascots/ninja4.png', sortOrder: 4, questionType: 'text', allowSuggestions: true, allowVoting: true },
 ]
 
 // ---------------------------------------------------------------------------
@@ -92,6 +95,8 @@ function setupApi(
       ? voteCounts
       : new Map(voteCounts.map((id) => [id, 1] as [string, number])),
   )
+  mockFetchQuestionResponses.mockResolvedValue([])
+  mockPostQuestionResponse.mockResolvedValue(undefined)
   mockPostSuggestion.mockImplementation(async (campaignId, questionId, name) => {
     const isDuplicate = suggestions.some(
       (s) => s.questionId === questionId && s.name.trim().toLowerCase() === name.trim().toLowerCase(),
@@ -145,6 +150,7 @@ beforeEach(() => {
   mockFetchQuestions.mockResolvedValue(ninjaQuestions)
   mockFetchSuggestions.mockResolvedValue([])
   mockFetchVoteCounts.mockResolvedValue(new Map())
+  mockFetchQuestionResponses.mockResolvedValue([])
 })
 
 afterEach(() => {
@@ -633,7 +639,7 @@ describe('VotingRules', () => {
       maxVotesPerCandidate: 2,
       maxVotesPerCategory: 3,
     }, [
-      { id: 'nominees', campaignId: 'best-padeller-2026', title: 'Nominees', description: 'desc', sortOrder: 1 },
+      { id: 'nominees', campaignId: 'best-padeller-2026', title: 'Nominees', description: 'desc', sortOrder: 1, questionType: 'text', allowSuggestions: true, allowVoting: true },
     ])
     render(<App campaignId="best-padeller-2026" />)
     await screen.findByRole('button', { name: /submit/i })
@@ -928,8 +934,8 @@ describe('campaign config loaded from storage', () => {
 describe('questions loaded from storage', () => {
   it('renders question titles from the API response', async () => {
     const customQuestions: Question[] = [
-      { id: 'q-1', campaignId: 'ninja-naming', title: 'Custom Ninja A', description: 'desc', sortOrder: 1 },
-      { id: 'q-2', campaignId: 'ninja-naming', title: 'Custom Ninja B', description: 'desc', sortOrder: 2 },
+      { id: 'q-1', campaignId: 'ninja-naming', title: 'Custom Ninja A', description: 'desc', sortOrder: 1, questionType: 'text', allowSuggestions: true, allowVoting: true },
+      { id: 'q-2', campaignId: 'ninja-naming', title: 'Custom Ninja B', description: 'desc', sortOrder: 2, questionType: 'text', allowSuggestions: true, allowVoting: true },
     ]
     setupApi([], [], ninjaCampaign, customQuestions)
     render(<App campaignId="ninja-naming" />)
@@ -940,7 +946,7 @@ describe('questions loaded from storage', () => {
 
   it('shows custom question in the suggestion form dropdown', async () => {
     const customQuestions: Question[] = [
-      { id: 'q-special', campaignId: 'ninja-naming', title: 'The Special Ninja', description: 'desc', sortOrder: 1 },
+      { id: 'q-special', campaignId: 'ninja-naming', title: 'The Special Ninja', description: 'desc', sortOrder: 1, questionType: 'text', allowSuggestions: true, allowVoting: true },
     ]
     setupApi([], [], ninjaCampaign, customQuestions)
     render(<App campaignId="ninja-naming" />)
@@ -961,6 +967,9 @@ describe('suggestion board heading', () => {
         description: 'Only the description should appear in the card.',
         imageUrl: '/special-ninja.png',
         sortOrder: 1,
+        questionType: 'text',
+        allowSuggestions: true,
+        allowVoting: true,
       },
     ]
     setupApi([], [], ninjaCampaign, singleQuestion)
@@ -983,6 +992,8 @@ describe('suggestion board heading', () => {
         title: 'The Special Ninja',
         description: undefined,
         sortOrder: 1,
+        questionType: 'text',
+        allowVoting: true,
       },
     ] as unknown as Question[]
 
@@ -997,7 +1008,7 @@ describe('suggestion board heading', () => {
 
   it('hides "Suggestions by question" when there is only one question', async () => {
     const singleQuestion: Question[] = [
-      { id: 'q-special', campaignId: 'ninja-naming', title: 'The Special Ninja', description: 'desc', sortOrder: 1 },
+      { id: 'q-special', campaignId: 'ninja-naming', title: 'The Special Ninja', description: 'desc', sortOrder: 1, questionType: 'text', allowSuggestions: true, allowVoting: true },
     ]
     setupApi([], [], ninjaCampaign, singleQuestion)
     render(<App campaignId="ninja-naming" />)
@@ -1066,14 +1077,13 @@ describe('campaign routing', () => {
     description: 'Nominate and vote for the best padeller of 2026.',
     status: 'active',
     createdAt: '2024-01-01T00:00:00.000Z',
-    allowSuggestions: true,
     maxVotesTotal: 3,
     maxVotesPerCategory: 3,
     maxVotesPerCandidate: 2,
   }
 
   const padelleQuestions: Question[] = [
-    { id: 'nominees', campaignId: 'best-padeller-2026', title: 'Who do you nominate?', description: 'Suggest and vote for your favourite padeller.', sortOrder: 1 },
+    { id: 'nominees', campaignId: 'best-padeller-2026', title: 'Who do you nominate?', description: 'Suggest and vote for your favourite padeller.', sortOrder: 1, questionType: 'text', allowSuggestions: true, allowVoting: true },
   ]
 
   it('renders the ninja campaign when campaignId=ninja-naming is passed', async () => {
@@ -1128,13 +1138,12 @@ describe('suggestion availability', () => {
       id: 'best-padeller-2026',
       title: 'Best Padeller 2026',
       description: 'Vote for the best padeller.',
-      allowSuggestions: false,
       maxVotesTotal: 3,
       maxVotesPerCategory: 3,
       maxVotesPerCandidate: 2,
     }
     const votingOnlyQuestions: Question[] = [
-      { id: 'nominees', campaignId: 'best-padeller-2026', title: 'Who do you nominate?', description: 'Suggest and vote for your favourite padeller.', sortOrder: 1 },
+      { id: 'nominees', campaignId: 'best-padeller-2026', title: 'Who do you nominate?', description: 'Suggest and vote for your favourite padeller.', sortOrder: 1, questionType: 'text', allowSuggestions: false, allowVoting: true },
     ]
 
     setupApi([], [], votingOnlyCampaign, votingOnlyQuestions)
@@ -1142,11 +1151,9 @@ describe('suggestion availability', () => {
 
     await screen.findByRole('heading', { name: /suggestions are closed/i })
     expect(screen.queryByRole('heading', { name: /share your thoughts/i })).not.toBeInTheDocument()
-    expect(
-      screen.getByText(
-        'This campaign is in voting-only mode. You can still review the published candidates and cast votes.',
-      ),
-    ).toBeInTheDocument()
+    expect(screen.getByText(
+      'This question is in voting-only mode. You can still review published candidates and cast votes.',
+    )).toBeInTheDocument()
   })
 })
 
@@ -1161,14 +1168,13 @@ describe('maxVotesPerCandidate', () => {
     description: 'Vote for the best padeller.',
     status: 'active',
     createdAt: '2024-01-01T00:00:00.000Z',
-    allowSuggestions: true,
     maxVotesTotal: 3,
     maxVotesPerCategory: 3,
     maxVotesPerCandidate: 2,
   }
 
   const multiVoteQuestions: Question[] = [
-    { id: 'nominees', campaignId: 'best-padeller-2026', title: 'Nominees', description: 'desc', sortOrder: 1 },
+    { id: 'nominees', campaignId: 'best-padeller-2026', title: 'Nominees', description: 'desc', sortOrder: 1, questionType: 'text', allowSuggestions: true, allowVoting: true },
   ]
 
   const alice: Suggestion = {
@@ -1330,7 +1336,7 @@ describe('maxVotesPerCandidate', () => {
 describe('empty imageUrl', () => {
   it('renders question cards without a broken image when imageUrl is empty', async () => {
     const questionsWithoutImage: Question[] = [
-      { id: 'q-1', campaignId: 'ninja-naming', title: 'Ninja Without Image', description: 'desc', sortOrder: 1 },
+      { id: 'q-1', campaignId: 'ninja-naming', title: 'Ninja Without Image', description: 'desc', sortOrder: 1, questionType: 'text', allowSuggestions: true, allowVoting: true },
     ]
     setupApi([], [], ninjaCampaign, questionsWithoutImage)
     render(<App campaignId="ninja-naming" />)

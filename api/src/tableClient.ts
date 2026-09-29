@@ -1,4 +1,5 @@
 import { TableClient, AzureNamedKeyCredential, TableEntityResult, RestError } from '@azure/data-tables'
+import type { QuestionType } from './responseValidation'
 
 const ensuredTables = new Set<string>()
 
@@ -71,6 +72,7 @@ export interface CampaignEntity {
   title: string
   description: string
   status: string       // 'draft' | 'active' | 'closed'
+  allowSuggestions?: boolean // Legacy field used only to migrate existing campaigns.
   maxVotesTotal: number
   maxVotesPerCategory: number
   maxVotesPerCandidate: number
@@ -96,7 +98,7 @@ export interface QuestionEntity {
   rowKey: string       // questionId
   title: string
   description: string
-  questionType?: string
+  questionType?: QuestionType
   allowSuggestions?: boolean
   allowVoting?: boolean
   options?: string[]

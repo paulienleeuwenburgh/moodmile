@@ -678,17 +678,6 @@ async function doSoftDeleteAllSuggestions(campaignId: string): Promise<void> {
     toDelete.push({ partitionKey: entity.partitionKey as string, rowKey: entity.rowKey as string })
   }
 
-  async function doResetResponses(campaignId: string): Promise<void> {
-    const client = getQuestionResponsesClient()
-    await ensureTableExists(client)
-    const filter = `PartitionKey ge '${escapeODataString(campaignId)}|' and PartitionKey lt '${escapeODataString(campaignId)}~'`
-    const rows: { partitionKey: string; rowKey: string }[] = []
-    for await (const entity of client.listEntities<QuestionResponseEntity>({ queryOptions: { filter } })) {
-      rows.push({ partitionKey: String(entity.partitionKey), rowKey: String(entity.rowKey) })
-    }
-    await processBatches(rows, (item) => client.deleteEntity(item.partitionKey, item.rowKey))
-  }
-
   await processBatches(toDelete, (item) =>
     client.updateEntity(
       {
@@ -702,6 +691,17 @@ async function doSoftDeleteAllSuggestions(campaignId: string): Promise<void> {
       'Merge',
     ),
   )
+}
+
+async function doResetResponses(campaignId: string): Promise<void> {
+  const client = getQuestionResponsesClient()
+  await ensureTableExists(client)
+  const filter = `PartitionKey ge '${escapeODataString(campaignId)}|' and PartitionKey lt '${escapeODataString(campaignId)}~'`
+  const rows: { partitionKey: string; rowKey: string }[] = []
+  for await (const entity of client.listEntities<QuestionResponseEntity>({ queryOptions: { filter } })) {
+    rows.push({ partitionKey: String(entity.partitionKey), rowKey: String(entity.rowKey) })
+  }
+  await processBatches(rows, (item) => client.deleteEntity(item.partitionKey, item.rowKey))
 }
 
 /**

@@ -8,6 +8,7 @@ import {
   getQuestionsClient,
   type QuestionEntity,
 } from './tableClient'
+import { validateQuestion } from './responseValidation'
 
 export interface CampaignConfig {
   id: string
@@ -34,11 +35,15 @@ export async function getQuestionConfig(campaignId: string, questionId: string) 
       try {
         const legacyCampaign = await campaignsClient.getEntity<CampaignEntity>('campaign', campaignId)
         question.allowSuggestions = Boolean(legacyCampaign.allowSuggestions)
-        question.allowVoting = question.allowSuggestions
+        question.allowVoting = true
       } catch {
         question.allowSuggestions = false
-        question.allowVoting = false
+        question.allowVoting = true
       }
+    }
+    const errors = validateQuestion(question)
+    if (errors.length > 0) {
+      throw new Error(`Invalid question configuration for "${questionId}": ${errors.join(' ')}`)
     }
     return question
   } catch (err) {

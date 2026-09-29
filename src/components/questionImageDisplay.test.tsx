@@ -10,7 +10,6 @@ const campaign: Campaign = {
   description: 'Description',
   status: 'active',
   createdAt: '2024-01-01T00:00:00.000Z',
-  allowSuggestions: false,
   maxVotesTotal: 1,
   maxVotesPerCategory: 1,
   maxVotesPerCandidate: 1,
@@ -24,6 +23,9 @@ function createQuestion(id: string): Question {
     campaignId: campaign.id,
     title: `Question ${id}`,
     description: 'Description',
+    questionType: 'text',
+    allowSuggestions: true,
+    allowVoting: true,
     imageUrl: `/images/${id}.png`,
     sortOrder: 1,
   }
