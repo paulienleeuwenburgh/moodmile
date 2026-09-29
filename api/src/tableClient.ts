@@ -71,7 +71,6 @@ export interface CampaignEntity {
   title: string
   description: string
   status: string       // 'draft' | 'active' | 'closed'
-  allowSuggestions: boolean
   maxVotesTotal: number
   maxVotesPerCategory: number
   maxVotesPerCandidate: number
@@ -97,6 +96,12 @@ export interface QuestionEntity {
   rowKey: string       // questionId
   title: string
   description: string
+  questionType?: string
+  allowSuggestions?: boolean
+  allowVoting?: boolean
+  options?: string[]
+  numericMin?: number
+  numericMax?: number
   imageUrl?: string
   sortOrder: number
   createdAt: string
@@ -117,7 +122,6 @@ export function entityToCampaignConfig(entity: TableEntityResult<CampaignEntity>
     title: entity.title,
     description: entity.description,
     status: entity.status,
-    allowSuggestions: entity.allowSuggestions,
     maxVotesTotal: entity.maxVotesTotal,
     maxVotesPerCategory: entity.maxVotesPerCategory,
     maxVotesPerCandidate: entity.maxVotesPerCandidate,
@@ -133,6 +137,12 @@ export function entityToQuestion(entity: TableEntityResult<QuestionEntity>) {
     campaignId: entity.partitionKey as string,
     title: entity.title,
     description: entity.description,
+    questionType: entity.questionType ?? 'text',
+    allowSuggestions: entity.allowSuggestions ?? true,
+    allowVoting: entity.allowVoting ?? (entity.questionType === undefined ? true : undefined),
+    options: entity.options,
+    numericMin: entity.numericMin,
+    numericMax: entity.numericMax,
     imageUrl: entity.imageUrl,
     sortOrder: entity.sortOrder,
     createdAt: entity.createdAt,
@@ -184,12 +194,25 @@ export interface VoteEntity {
   createdAt: string
 }
 
+export interface QuestionResponseEntity {
+  partitionKey: string // "{campaignId}|{questionId}"
+  rowKey: string // sessionId
+  campaignId: string
+  questionId: string
+  answer: string // JSON-serialized string, string[], boolean, or number
+  createdAt: string
+}
+
 export function getSuggestionsClient(): TableClient {
   return getTableClient('suggestions')
 }
 
 export function getVotesClient(): TableClient {
   return getTableClient('votes')
+}
+
+export function getQuestionResponsesClient(): TableClient {
+  return getTableClient('questionResponses')
 }
 
 export function entityToSuggestion(entity: TableEntityResult<SuggestionEntity>) {

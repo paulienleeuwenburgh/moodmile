@@ -4,6 +4,9 @@ import {
   ensureTableExists,
   entityToCampaignConfig,
   type CampaignEntity,
+  entityToQuestion,
+  getQuestionsClient,
+  type QuestionEntity,
 } from './tableClient'
 
 export interface CampaignConfig {
@@ -11,7 +14,6 @@ export interface CampaignConfig {
   title: string
   description: string
   status: string
-  allowSuggestions: boolean
   /** Maximum votes a user may cast across the entire campaign. 0 = unlimited. */
   maxVotesTotal: number
   /** Maximum votes a user may cast within a single category (question). 0 = unlimited. */
@@ -20,6 +22,31 @@ export interface CampaignConfig {
   maxVotesPerCandidate: number
   /** Optional hero/banner image URL. */
   bannerImageUrl?: string
+}
+
+export async function getQuestionConfig(campaignId: string, questionId: string) {
+  const [questionsClient, campaignsClient] = [getQuestionsClient(), getCampaignsClient()]
+  await Promise.all([ensureTableExists(questionsClient), ensureTableExists(campaignsClient)])
+  try {
+    const entity = await questionsClient.getEntity<QuestionEntity>(campaignId, questionId)
+    const question = entityToQuestion(entity)
+    if (entity.allowSuggestions === undefined) {
+      try {
+        const legacyCampaign = await campaignsClient.getEntity<CampaignEntity>('campaign', campaignId)
+        question.allowSuggestions = Boolean(legacyCampaign.allowSuggestions)
+        question.allowVoting = question.allowSuggestions
+      } catch {
+        question.allowSuggestions = false
+        question.allowVoting = false
+      }
+    }
+    return question
+  } catch (err) {
+    if (err instanceof RestError && err.statusCode === 404) {
+      return undefined
+    }
+    throw err
+  }
 }
 
 /**
@@ -54,4 +81,3 @@ export async function getActiveCampaign(): Promise<CampaignConfig | undefined> {
   }
   return undefined
 }
-

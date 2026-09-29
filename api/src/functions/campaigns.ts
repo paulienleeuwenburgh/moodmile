@@ -4,11 +4,11 @@ import {
   getQuestionsClient,
   ensureTableExists,
   entityToCampaignConfig,
-  entityToQuestion,
   type CampaignEntity,
   type QuestionEntity,
 } from '../tableClient'
 import { seedDefaultCampaign } from '../seed'
+import { getQuestionConfig } from '../campaigns'
 
 /**
  * GET /api/campaign?campaignId=X
@@ -68,13 +68,15 @@ async function getQuestions(
   const client = getQuestionsClient()
   await ensureTableExists(client)
 
-  const questions = []
+  const questionIds: string[] = []
   for await (const entity of client.listEntities<QuestionEntity>({
     queryOptions: { filter: `PartitionKey eq '${campaignId.replace(/'/g, "''")}'` },
   })) {
-    questions.push(entityToQuestion(entity))
+    questionIds.push(String(entity.rowKey))
   }
 
+  const questions = (await Promise.all(questionIds.map((questionId) => getQuestionConfig(campaignId, questionId))))
+    .filter((question) => question !== undefined)
   questions.sort((a, b) => a.sortOrder - b.sortOrder)
 
   return {

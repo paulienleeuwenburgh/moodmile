@@ -1,6 +1,20 @@
-import type { Question, QuestionType } from '../../src/types'
-
 export type ResponseAnswer = string | string[] | boolean | number
+export type QuestionType =
+  | 'categorical-single'
+  | 'categorical-multiple'
+  | 'boolean'
+  | 'ordinal'
+  | 'numeric'
+  | 'text'
+
+export interface QuestionConfig {
+  questionType: QuestionType
+  allowSuggestions: boolean
+  allowVoting?: boolean
+  options?: string[]
+  numericMin?: number
+  numericMax?: number
+}
 
 const QUESTION_TYPES: readonly QuestionType[] = [
   'categorical-single',
@@ -11,7 +25,7 @@ const QUESTION_TYPES: readonly QuestionType[] = [
   'text',
 ]
 
-export function validateQuestion(question: Partial<Question>): string[] {
+export function validateQuestion(question: Partial<QuestionConfig>): string[] {
   const errors: string[] = []
   if (!QUESTION_TYPES.includes(question.questionType as QuestionType)) {
     errors.push('questionType must be a supported question type.')
@@ -60,7 +74,7 @@ export function validateQuestion(question: Partial<Question>): string[] {
   return errors
 }
 
-export function validateResponse(question: Question, answer: unknown): string | undefined {
+export function validateResponse(question: QuestionConfig, answer: unknown): string | undefined {
   switch (question.questionType) {
     case 'categorical-single':
     case 'ordinal':

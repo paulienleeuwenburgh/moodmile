@@ -7,7 +7,7 @@ import {
   SuggestionEntity,
 } from '../tableClient'
 import { escapeODataString } from '../odata'
-import { getCampaign } from '../campaigns'
+import { getQuestionConfig } from '../campaigns'
 import { validateSuggestion } from '../suggestionValidation'
 
 async function getSuggestions(
@@ -61,13 +61,16 @@ async function postSuggestion(
     return { status: 400, jsonBody: { error: validationError } }
   }
 
-  const campaign = await getCampaign(campaignId)
-  if (!campaign) {
-    return { status: 404, jsonBody: { error: 'Campaign not found' } }
+  const question = await getQuestionConfig(campaignId, questionId)
+  if (!question) {
+    return { status: 404, jsonBody: { error: 'Question not found' } }
   }
 
-  if (!campaign.allowSuggestions) {
-    return { status: 403, jsonBody: { error: 'Suggestions are not allowed for this campaign' } }
+  if (question.questionType !== 'text') {
+    return { status: 400, jsonBody: { error: 'Suggestions are only supported for text questions' } }
+  }
+  if (!question.allowSuggestions) {
+    return { status: 403, jsonBody: { error: 'Suggestions are not allowed for this question' } }
   }
 
   const client = getSuggestionsClient()

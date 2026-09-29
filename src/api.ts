@@ -1,4 +1,4 @@
-import type { AdminCampaignSummary, Campaign, ExportFormat, Question, Suggestion } from './types'
+import type { AdminCampaignSummary, Campaign, ExportFormat, Question, QuestionResponse, Suggestion } from './types'
 
 const BASE = '/api'
 
@@ -36,6 +36,23 @@ export async function fetchQuestions(campaignId: string): Promise<Question[]> {
 
 export async function fetchSuggestions(campaignId: string): Promise<Suggestion[]> {
   return apiFetch<Suggestion[]>(`/suggestions?campaignId=${encodeURIComponent(campaignId)}`)
+}
+
+export async function fetchQuestionResponses(campaignId: string): Promise<QuestionResponse[]> {
+  return apiFetch<QuestionResponse[]>(`/responses?campaignId=${encodeURIComponent(campaignId)}`)
+}
+
+export async function postQuestionResponse(
+  campaignId: string,
+  questionId: string,
+  answer: QuestionResponse['answer'],
+  sessionId: string,
+): Promise<void> {
+  await apiFetch('/responses', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ campaignId, questionId, answer, sessionId }),
+  })
 }
 
 export async function postSuggestion(

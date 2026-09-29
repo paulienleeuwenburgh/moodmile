@@ -6,14 +6,26 @@ import { QuestionCard } from './components/QuestionCard'
 import { SuggestionBoard } from './components/SuggestionBoard'
 import { SuggestionForm } from './components/SuggestionForm'
 import { VotingRules } from './components/VotingRules'
-import type { Campaign, Question, Suggestion } from './types'
-import { ApiError, fetchCampaign, fetchQuestions, fetchSuggestions, fetchVoteCounts, postSuggestion, postVote } from './api'
+import type { Campaign, Question, QuestionResponse, Suggestion } from './types'
+import { ApiError, fetchCampaign, fetchQuestions, fetchSuggestions, fetchVoteCounts, fetchQuestionResponses, postQuestionResponse, postSuggestion, postVote } from './api'
 import { getSessionId } from './utils/sessionId'
 import { canCastVote, getClientVoteRecords } from './utils/voteLimits'
 import { useDocumentTitle } from './hooks/useDocumentTitle'
+import { QuestionResponseForm } from './components/QuestionResponseForm'
 
 interface AppProps {
   campaignId: string
+}
+
+const handleQuestionResponseSubmit = async (question: Question, answer: QuestionResponse['answer']) => {
+  if (!campaign) return
+  try {
+    await postQuestionResponse(campaign.id, question.id, answer, getSessionId())
+    setQuestionResponses(await fetchQuestionResponses(campaign.id))
+    setActionError(null)
+  } catch (err) {
+    setActionError(err instanceof Error ? err.message : 'Failed to save your answer.')
+  }
 }
 
 const STALE_DATA_MESSAGE =
@@ -33,6 +45,7 @@ function App({ campaignId }: AppProps) {
   const [questions, setQuestions] = useState<Question[]>([])
   const [selectedQuestionId, setSelectedQuestionId] = useState('')
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
+  const [questionResponses, setQuestionResponses] = useState<QuestionResponse[]>([])
   const [voteCountById, setVoteCountById] = useState<Map<string, number>>(new Map())
   const [actionError, setActionError] = useState<string | null>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -60,10 +73,11 @@ function App({ campaignId }: AppProps) {
 
     try {
       const loadedCampaign = await fetchCampaign(campaignId)
-      const [loadedQuestions, loadedSuggestions, loadedVoteCounts] = await Promise.all([
+      const [loadedQuestions, loadedSuggestions, loadedVoteCounts, loadedResponses] = await Promise.all([
         fetchQuestions(campaignId),
         fetchSuggestions(campaignId),
         fetchVoteCounts(campaignId, sessionId),
+        fetchQuestionResponses(campaignId),
       ])
 
       setCampaign(loadedCampaign)
@@ -74,6 +88,7 @@ function App({ campaignId }: AppProps) {
           : (loadedQuestions[0]?.id ?? ''),
       )
       setSuggestions(loadedSuggestions)
+      setQuestionResponses(loadedResponses)
       setVoteCountById(loadedVoteCounts)
       setLastUpdatedAt(new Date().toISOString())
 
@@ -162,6 +177,8 @@ function App({ campaignId }: AppProps) {
     const sessionId = getSessionId()
     const suggestion = suggestions.find((s) => s.id === suggestionId)
     if (!suggestion) return
+    const question = questions.find((item) => item.id === suggestion.questionId)
+    if (!question || question.questionType !== 'text' || !question.allowVoting || !question.allowSuggestions) return
 
     if (!revoke && !canCastVote(currentCampaign, voteRecords, suggestion.questionId, suggestion.id)) {
       return
@@ -219,6 +236,10 @@ function App({ campaignId }: AppProps) {
     if (!suggestion) {
       return false
     }
+    const question = questions.find((item) => item.id === suggestion.questionId)
+    if (!question || question.questionType !== 'text' || !question.allowVoting || !question.allowSuggestions) {
+      return true
+    }
     if (campaign.maxVotesPerCandidate === 1 && (voteCountById.get(suggestionId) ?? 0) > 0) {
       return false
     }
@@ -262,6 +283,13 @@ function App({ campaignId }: AppProps) {
 
   const bannerImageUrl = campaign.bannerImageUrl?.trim()
   const showBanner = Boolean(bannerImageUrl && failedBannerUrl !== bannerImageUrl)
+  const selectedQuestion = questions.find((question) => question.id === selectedQuestionId)
+  const suggestionQuestions = questions.filter((question) => question.questionType === 'text' && question.allowSuggestions)
+  const votableQuestions = suggestionQuestions.filter((question) => question.allowVoting)
+  const visibleSuggestions = suggestions.filter((suggestion) => votableQuestions.some((question) => question.id === suggestion.questionId))
+  const answerResults = selectedQuestion
+    ? questionResponses.filter((response) => response.questionId === selectedQuestion.id)
+    : []
 
   return (
     <main className="app-shell">
@@ -347,44 +375,67 @@ function App({ campaignId }: AppProps) {
         ))}
       </section>
 
-      <VotingRules
+      {questions.some((question) => question.questionType === 'text' && question.allowVoting && question.allowSuggestions) && <VotingRules
         maxVotesTotal={campaign.maxVotesTotal}
         maxVotesPerCategory={campaign.maxVotesPerCategory}
         maxVotesPerCandidate={campaign.maxVotesPerCandidate}
         votesUsed={voteRecords.length}
-      />
+      />}
 
-      {campaign.allowSuggestions ? (
+      {selectedQuestion?.questionType === 'text' && selectedQuestion.allowSuggestions ? (
         <SuggestionForm
-          questions={questions}
-          selectedQuestionId={selectedQuestionId}
+          questions={[selectedQuestion]}
+          selectedQuestionId={selectedQuestion.id}
           onQuestionChange={setSelectedQuestionId}
           onSubmitSuggestion={handleSuggestionSubmit}
         />
-      ) : (
+      ) : selectedQuestion && selectedQuestion.questionType !== 'text' ? (
+        <QuestionResponseForm
+          question={selectedQuestion}
+          onSubmit={(answer) => handleQuestionResponseSubmit(selectedQuestion, answer)}
+        />
+      ) : null}
+      {selectedQuestion?.questionType === 'text' && !selectedQuestion.allowSuggestions && (
         <section className="suggestion-state suggestion-state--closed" aria-label="Suggestions closed">
           <h2>Suggestions are closed</h2>
-          <p>This campaign is in voting-only mode. You can still review the published candidates and cast votes.</p>
+          <p>This question is in voting-only mode. You can still review published candidates and cast votes.</p>
         </section>
       )}
 
-      <SuggestionBoard
-        campaign={campaign}
-        questions={questions}
-        suggestions={suggestions}
-        voteCountById={voteCountById}
-        onVote={handleVote}
-        isVoteDisabled={isVoteDisabled}
-      />
+      {selectedQuestion && selectedQuestion.questionType !== 'text' && answerResults.length > 0 && (
+        <section className="suggestion-board" aria-label="Answer results">
+          <h2>Responses</h2>
+          <ul>
+            {answerResults.map((result) => (
+              <li key={JSON.stringify(result.answer)}>
+                <span>{Array.isArray(result.answer) ? result.answer.join(', ') : String(result.answer)}</span>
+                <span>{result.count}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
-      <Leaderboard
-        campaign={campaign}
-        questions={questions}
-        suggestions={suggestions}
-        voteCountById={voteCountById}
-        onVote={handleVote}
-        isVoteDisabled={isVoteDisabled}
-      />
+      {suggestionQuestions.length > 0 && (
+        <SuggestionBoard
+          questions={suggestionQuestions}
+          suggestions={suggestions.filter((suggestion) => suggestionQuestions.some((question) => question.id === suggestion.questionId))}
+          voteCountById={voteCountById}
+          onVote={handleVote}
+          isVoteDisabled={isVoteDisabled}
+        />
+      )}
+
+      {votableQuestions.length > 0 && (
+        <Leaderboard
+          campaign={campaign}
+          questions={votableQuestions}
+          suggestions={visibleSuggestions}
+          voteCountById={voteCountById}
+          onVote={handleVote}
+          isVoteDisabled={isVoteDisabled}
+        />
+      )}
 
       <Footer />
     </main>

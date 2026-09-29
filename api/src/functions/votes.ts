@@ -11,7 +11,7 @@ import {
   votePartitionKey,
 } from '../tableClient'
 import { escapeODataString } from '../odata'
-import { getCampaign } from '../campaigns'
+import { getCampaign, getQuestionConfig } from '../campaigns'
 import { canCastVote, filterVoteRecordsByActiveSuggestions, type VoteRecord } from '../voteLimits'
 
 interface StoredVoteRecord extends VoteRecord {
@@ -118,6 +118,13 @@ async function postVote(
   const campaign = await getCampaign(campaignId)
   if (!campaign) {
     return { status: 404, jsonBody: { error: 'Campaign not found' } }
+  }
+  const question = await getQuestionConfig(campaignId, questionId)
+  if (!question) {
+    return { status: 404, jsonBody: { error: 'Question not found' } }
+  }
+  if (!revoke && (question.questionType !== 'text' || !question.allowVoting || !question.allowSuggestions)) {
+    return { status: 403, jsonBody: { error: 'Voting is not enabled for this question' } }
   }
 
   const votesClient = getVotesClient()
