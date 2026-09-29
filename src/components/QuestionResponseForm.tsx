@@ -81,8 +81,9 @@ export function QuestionResponseForm({ question, onSubmit }: QuestionResponseFor
           <legend>{question.title}{question.required ? ' (required)' : ''}</legend>
           {question.questionType === 'categorical' && (question.numberOfVotes ?? 1) > 1 && (
             <p className="question-response__instructions">
-              Submit {question.numberOfVotes} votes
-              {question.duplicateVotingAllowed ? ', multiple votes per answer allowed' : ''}
+              {question.duplicateVotingAllowed
+                ? `Submit ${question.numberOfVotes} votes, multiple votes per answer allowed`
+                : `Select up to ${question.numberOfVotes} options`}
             </p>
           )}
           <ul className="question-response__options">

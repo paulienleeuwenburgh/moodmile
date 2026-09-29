@@ -97,6 +97,7 @@ export interface QuestionEntity {
   rowKey: string       // questionId
   title: string
   description: string
+  status?: string
   questionType: string
   allowSuggestions?: boolean
   required?: boolean
@@ -180,6 +181,7 @@ export function entityToQuestion(entity: TableEntityResult<QuestionEntity>) {
     campaignId: entity.partitionKey as string,
     title: entity.title,
     description: entity.description,
+    status: entity.status,
     questionType,
     allowSuggestions: questionType === 'text' ? normalizeBoolean(entity.allowSuggestions, true) : false,
     required: normalizeBoolean(entity.required, false),

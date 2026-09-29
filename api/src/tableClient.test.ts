@@ -37,6 +37,10 @@ describe('entityToQuestion defaults', () => {
     expect(question.maxSize).toBeUndefined()
   })
 
+  it('preserves question status from Azure Table Storage', () => {
+    expect(entityToQuestion(questionEntity({ questionType: 'categorical', status: 'active' })).status).toBe('active')
+  })
+
   it('does not apply voting-only settings to other question types', () => {
     const question = entityToQuestion(questionEntity({ questionType: 'boolean' }))
     expect(question.numberOfVotes).toBeUndefined()

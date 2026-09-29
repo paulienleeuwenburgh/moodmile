@@ -31,6 +31,7 @@ export interface Question {
   campaignId: string
   title: string
   description: string
+  status?: string
   questionType: QuestionType
   allowSuggestions: boolean
   required?: boolean

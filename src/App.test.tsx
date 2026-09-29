@@ -62,10 +62,10 @@ const ninjaCampaign: Campaign = {
 }
 
 const ninjaQuestions: Question[] = [
-  { id: 'ninja-1', campaignId: 'ninja-naming', title: 'Ninja 1', description: 'This ninja needs a name.', imageUrl: '/mascots/ninja1.png', sortOrder: 1, questionType: 'text', allowSuggestions: true, numberOfVotes: 1, duplicateVotingAllowed: false },
-  { id: 'ninja-2', campaignId: 'ninja-naming', title: 'Ninja 2', description: 'This ninja needs a name.', imageUrl: '/mascots/ninja2.png', sortOrder: 2, questionType: 'text', allowSuggestions: true, numberOfVotes: 1, duplicateVotingAllowed: false },
-  { id: 'ninja-3', campaignId: 'ninja-naming', title: 'Ninja 3', description: 'This ninja needs a name.', imageUrl: '/mascots/ninja3.png', sortOrder: 3, questionType: 'text', allowSuggestions: true, numberOfVotes: 1, duplicateVotingAllowed: false },
-  { id: 'ninja-4', campaignId: 'ninja-naming', title: 'Ninja 4', description: 'This ninja needs a name.', imageUrl: '/mascots/ninja4.png', sortOrder: 4, questionType: 'text', allowSuggestions: true, numberOfVotes: 1, duplicateVotingAllowed: false },
+  { id: 'ninja-1', campaignId: 'ninja-naming', title: 'Ninja 1', description: 'This ninja needs a name.', status: 'active', imageUrl: '/mascots/ninja1.png', sortOrder: 1, questionType: 'text', allowSuggestions: true, numberOfVotes: 1, duplicateVotingAllowed: false },
+  { id: 'ninja-2', campaignId: 'ninja-naming', title: 'Ninja 2', description: 'This ninja needs a name.', status: 'active', imageUrl: '/mascots/ninja2.png', sortOrder: 2, questionType: 'text', allowSuggestions: true, numberOfVotes: 1, duplicateVotingAllowed: false },
+  { id: 'ninja-3', campaignId: 'ninja-naming', title: 'Ninja 3', description: 'This ninja needs a name.', status: 'active', imageUrl: '/mascots/ninja3.png', sortOrder: 3, questionType: 'text', allowSuggestions: true, numberOfVotes: 1, duplicateVotingAllowed: false },
+  { id: 'ninja-4', campaignId: 'ninja-naming', title: 'Ninja 4', description: 'This ninja needs a name.', status: 'active', imageUrl: '/mascots/ninja4.png', sortOrder: 4, questionType: 'text', allowSuggestions: true, numberOfVotes: 1, duplicateVotingAllowed: false },
 ]
 
 // ---------------------------------------------------------------------------
@@ -88,7 +88,10 @@ function setupApi(
   questions: Question[] = ninjaQuestions,
 ) {
   mockFetchCampaign.mockResolvedValue(campaign)
-  mockFetchQuestions.mockResolvedValue(questions)
+  mockFetchQuestions.mockResolvedValue(questions.map((question) => ({
+    ...question,
+    status: question.status ?? 'active',
+  })))
   mockFetchSuggestions.mockResolvedValue(suggestions)
   mockFetchVoteCounts.mockResolvedValue(
     voteCounts instanceof Map
@@ -1091,7 +1094,7 @@ describe('campaign routing', () => {
   }
 
   const padelleQuestions: Question[] = [
-    { id: 'nominees', campaignId: 'best-padeller-2026', title: 'Who do you nominate?', description: 'Suggest and vote for your favourite padeller.', sortOrder: 1, questionType: 'text', allowSuggestions: true, numberOfVotes: 1, duplicateVotingAllowed: false },
+    { id: 'nominees', campaignId: 'best-padeller-2026', title: 'Who do you nominate?', description: 'Suggest and vote for your favourite padeller.', status: 'active', sortOrder: 1, questionType: 'text', allowSuggestions: true, numberOfVotes: 1, duplicateVotingAllowed: false },
   ]
 
   it('renders the ninja campaign when campaignId=ninja-naming is passed', async () => {
@@ -1248,6 +1251,72 @@ describe('typed questions', () => {
       ['Red', 'Red'],
       expect.stringMatching(/^[0-9a-f-]{36}$/i),
     ))
+  })
+
+  it('shows the selection limit when repeated categorical votes are disabled', async () => {
+    const question: Question = {
+      id: 'color',
+      campaignId: 'ninja-naming',
+      title: 'Favorite color?',
+      description: '',
+      sortOrder: 1,
+      questionType: 'categorical',
+      allowSuggestions: false,
+      numberOfVotes: 3,
+      duplicateVotingAllowed: false,
+      options: ['Red', 'Blue', 'Green'],
+    }
+    setupApi([], [], ninjaCampaign, [question])
+    render(<App campaignId="ninja-naming" />)
+
+    expect(await screen.findByText('Select up to 3 options')).toBeInTheDocument()
+    expect(screen.queryByText(/multiple votes per answer allowed/i)).not.toBeInTheDocument()
+  })
+
+  it('renders only questions with active status', async () => {
+    const questions: Question[] = [
+      {
+        id: 'active-question',
+        campaignId: 'ninja-naming',
+        title: 'Active question',
+        description: '',
+        status: 'active',
+        sortOrder: 1,
+        questionType: 'categorical',
+        allowSuggestions: false,
+        options: ['Yes', 'No'],
+      },
+      {
+        id: 'draft-question',
+        campaignId: 'ninja-naming',
+        title: 'Draft question',
+        description: '',
+        status: 'draft',
+        sortOrder: 2,
+        questionType: 'categorical',
+        allowSuggestions: false,
+        options: ['Yes', 'No'],
+      },
+      {
+        id: 'unspecified-question',
+        campaignId: 'ninja-naming',
+        title: 'Unspecified question',
+        description: '',
+        sortOrder: 3,
+        questionType: 'categorical',
+        allowSuggestions: false,
+        options: ['Yes', 'No'],
+      },
+    ]
+    setupApi([], [], ninjaCampaign, questions)
+    mockFetchQuestions.mockResolvedValue(questions)
+    render(<App campaignId="ninja-naming" />)
+
+    expect(await screen.findByRole('region', { name: 'Active question' })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Draft question' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Unspecified question' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Draft question')).not.toBeInTheDocument()
+    expect(screen.queryByText('Unspecified question')).not.toBeInTheDocument()
   })
 
   it('does not show voting controls for text questions with voting disabled', async () => {

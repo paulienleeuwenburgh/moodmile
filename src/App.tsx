@@ -69,7 +69,7 @@ function App({ campaignId }: AppProps) {
       ])
 
       setCampaign(loadedCampaign)
-      setQuestions(loadedQuestions)
+      setQuestions(loadedQuestions.filter((question) => question.status === 'active'))
       setSuggestions(loadedSuggestions)
       setQuestionResponses(loadedResponses)
       setVoteCountById(loadedVoteCounts)
