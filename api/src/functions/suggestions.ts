@@ -1,4 +1,5 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions'
+import type { TableEntityResult } from '@azure/data-tables'
 import {
   ensureTableExists,
   entityToSuggestion,
@@ -19,7 +20,6 @@ async function getSuggestions(
   const sessionId = request.query.get('sessionId')?.trim() || undefined
   const client = getSuggestionsClient()
   await ensureTableExists(client)
-  const suggestions = []
 
   // Filter all partition keys that start with "{campaignId}|".
   // '~' (ASCII 126) is one above '|' (ASCII 124), giving a correct lexicographic upper bound.
@@ -32,39 +32,57 @@ async function getSuggestions(
   const deletedFilter = `isDeleted ne true`
   const filter = partitionFilter ? `${partitionFilter} and ${deletedFilter}` : deletedFilter
 
-  // Cache question configs per request to avoid repeat lookups for suggestions sharing a question.
-  const questionConfigCache = new Map<string, Awaited<ReturnType<typeof getQuestionConfig>>>()
-
+  const entities: TableEntityResult<SuggestionEntity>[] = []
   for await (const entity of client.listEntities<SuggestionEntity>({
     queryOptions: { filter },
   })) {
+    entities.push(entity)
+  }
+
+  // Resolve one question config per distinct (campaignId, questionId) pair, in parallel,
+  // instead of sequentially inside the loop below.
+  const cacheKeys = new Map<string, { entityCampaignId: string; questionId: string }>()
+  for (const entity of entities) {
     const entityCampaignId = entity.campaignId ?? campaignId ?? ''
     const questionId = entity.questionId
-    const cacheKey = `${entityCampaignId}|${questionId}`
-    if (!questionConfigCache.has(cacheKey)) {
+    cacheKeys.set(`${entityCampaignId}|${questionId}`, { entityCampaignId, questionId })
+  }
+
+  const questionConfigCache = new Map<string, Awaited<ReturnType<typeof getQuestionConfig>> | 'invalid'>()
+  await Promise.all(
+    Array.from(cacheKeys.entries()).map(async ([cacheKey, { entityCampaignId, questionId }]) => {
       // A single misconfigured question (e.g. a draft still being set up) must not take
-      // down the whole suggestions list. Treat lookup failures as "no visibility rule" so
-      // affected suggestions simply fall back to the default (visible to everyone).
-      let config: Awaited<ReturnType<typeof getQuestionConfig>>
+      // down the whole suggestions list. Mark lookup failures as 'invalid' so we can fail
+      // closed below (hide the question's submissions) rather than assume they're public.
       try {
-        config = await getQuestionConfig(entityCampaignId, questionId)
+        questionConfigCache.set(cacheKey, await getQuestionConfig(entityCampaignId, questionId))
       } catch (err) {
         context.warn(
-          `Ignoring visibility rule for invalid question "${questionId}" in campaign "${entityCampaignId}": ${err instanceof Error ? err.message : String(err)}`,
+          `Hiding submissions for invalid question "${questionId}" in campaign "${entityCampaignId}": ${err instanceof Error ? err.message : String(err)}`,
         )
-        config = undefined
+        questionConfigCache.set(cacheKey, 'invalid')
       }
-      questionConfigCache.set(cacheKey, config)
-    }
+    }),
+  )
+
+  // NOTE: sessionId is a client-generated, unauthenticated identifier (see getSessionId()).
+  // This filter is a best-effort UI convenience, not an access-control boundary: anyone who
+  // learns another session's ID could still match against it. Do not rely on this for
+  // protecting sensitive data.
+  const suggestions = []
+  for (const entity of entities) {
+    const entityCampaignId = entity.campaignId ?? campaignId ?? ''
+    const cacheKey = `${entityCampaignId}|${entity.questionId}`
     const question = questionConfigCache.get(cacheKey)
 
     // When a question restricts visibility to the owner's own submissions
     // (displaySubmissions=false and voting is not enabled), only include
     // suggestions created by the requesting session. A missing/blank sessionId never
     // matches, even against suggestions stored without a sessionId of their own.
+    // If the question's config could not be loaded, fail closed and apply the same
+    // own-submissions-only restriction rather than assuming the question is public.
     const isVisible =
-      !question ||
-      shouldDisplayAllSubmissions(question) ||
+      (question !== 'invalid' && (!question || shouldDisplayAllSubmissions(question))) ||
       (Boolean(sessionId) && entity.sessionId === sessionId)
     if (!isVisible) {
       continue

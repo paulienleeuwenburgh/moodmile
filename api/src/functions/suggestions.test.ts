@@ -119,4 +119,16 @@ describe('getSuggestions visibility filtering', () => {
     expect(response.jsonBody).toEqual([{ id: 's1', name: 'Mine' }])
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('broken-question'))
   })
+
+  it('fails closed and hides other users submissions when the question config cannot be loaded', async () => {
+    mockListEntities.mockReturnValue(suggestionRows([
+      { rowKey: 's1', name: 'Mine', questionId: 'broken-question', campaignId: 'c1', sessionId: 'my-session' },
+      { rowKey: 's2', name: 'Theirs', questionId: 'broken-question', campaignId: 'c1', sessionId: 'other-session' },
+    ]))
+    mockGetQuestionConfig.mockRejectedValue(new Error('Invalid question configuration'))
+
+    const response = await getSuggestionsHandler(request('c1', 'my-session'), { warn: vi.fn() })
+
+    expect(response.jsonBody).toEqual([{ id: 's1', name: 'Mine' }])
+  })
 })
