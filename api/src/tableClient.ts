@@ -131,6 +131,8 @@ function normalizeBoolean(value: unknown, defaultValue: boolean): boolean {
   return value as boolean
 }
 
+function normalizeNumber(value: unknown, defaultValue: number): number
+function normalizeNumber(value: unknown, defaultValue?: number): number | undefined
 function normalizeNumber(value: unknown, defaultValue?: number): number | undefined {
   if (value === undefined) return defaultValue
   if (typeof value === 'number') return value
@@ -158,9 +160,9 @@ export function entityToCampaignConfig(entity: TableEntityResult<CampaignEntity>
     // 0 = unlimited. Default missing vote-budget fields to unlimited rather than leaving
     // them undefined, so campaigns created/edited directly in Table Storage without these
     // properties still behave predictably instead of producing NaN in vote-limit math.
-    maxVotesTotal: normalizeNumber(entity.maxVotesTotal, 0) as number,
-    maxVotesPerCategory: normalizeNumber(entity.maxVotesPerCategory, 0) as number,
-    maxVotesPerCandidate: normalizeNumber(entity.maxVotesPerCandidate, 0) as number,
+    maxVotesTotal: normalizeNumber(entity.maxVotesTotal, 0),
+    maxVotesPerCategory: normalizeNumber(entity.maxVotesPerCategory, 0),
+    maxVotesPerCandidate: normalizeNumber(entity.maxVotesPerCandidate, 0),
     createdAt: entity.createdAt,
     updatedAt: entity.updatedAt,
     bannerImageUrl: entity.bannerImageUrl,
