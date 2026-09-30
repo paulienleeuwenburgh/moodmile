@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { entityToQuestion, type QuestionEntity } from './tableClient'
+import { entityToCampaignConfig, entityToQuestion, type CampaignEntity, type QuestionEntity } from './tableClient'
 import { validateQuestion } from './responseValidation'
 
 function questionEntity(values: Partial<QuestionEntity> = {}) {
@@ -14,6 +14,43 @@ function questionEntity(values: Partial<QuestionEntity> = {}) {
     ...values,
   } as never
 }
+
+function campaignEntity(values: Partial<CampaignEntity> = {}) {
+  return {
+    partitionKey: 'campaign',
+    rowKey: 'campaign-1',
+    title: 'Campaign',
+    description: '',
+    status: 'active',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    ...values,
+  } as never
+}
+
+describe('entityToCampaignConfig defaults', () => {
+  it('defaults missing vote-budget fields to unlimited (0) instead of undefined', () => {
+    const campaign = entityToCampaignConfig(campaignEntity())
+    expect(campaign).toMatchObject({
+      maxVotesTotal: 0,
+      maxVotesPerCategory: 0,
+      maxVotesPerCandidate: 0,
+    })
+  })
+
+  it('preserves explicit vote-budget values', () => {
+    const campaign = entityToCampaignConfig(campaignEntity({
+      maxVotesTotal: 4,
+      maxVotesPerCategory: 1,
+      maxVotesPerCandidate: 1,
+    }))
+    expect(campaign).toMatchObject({
+      maxVotesTotal: 4,
+      maxVotesPerCategory: 1,
+      maxVotesPerCandidate: 1,
+    })
+  })
+})
 
 describe('entityToQuestion defaults', () => {
   it('defaults Text properties for optional answers, suggestion length, and disabled voting', () => {

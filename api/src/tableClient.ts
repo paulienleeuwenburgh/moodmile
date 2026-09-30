@@ -155,9 +155,12 @@ export function entityToCampaignConfig(entity: TableEntityResult<CampaignEntity>
     title: entity.title,
     description: entity.description,
     status: entity.status,
-    maxVotesTotal: entity.maxVotesTotal,
-    maxVotesPerCategory: entity.maxVotesPerCategory,
-    maxVotesPerCandidate: entity.maxVotesPerCandidate,
+    // 0 = unlimited. Default missing vote-budget fields to unlimited rather than leaving
+    // them undefined, so campaigns created/edited directly in Table Storage without these
+    // properties still behave predictably instead of producing NaN in vote-limit math.
+    maxVotesTotal: normalizeNumber(entity.maxVotesTotal, 0) as number,
+    maxVotesPerCategory: normalizeNumber(entity.maxVotesPerCategory, 0) as number,
+    maxVotesPerCandidate: normalizeNumber(entity.maxVotesPerCandidate, 0) as number,
     createdAt: entity.createdAt,
     updatedAt: entity.updatedAt,
     bannerImageUrl: entity.bannerImageUrl,
