@@ -929,7 +929,7 @@ describe('campaign config loaded from storage', () => {
     setupApi([{ ...testSuggestion }])
     render(<App campaignId="ninja-naming" />)
     await screen.findAllByRole('button', { name: /vote for rocket/i })
-    expect(mockFetchSuggestions).toHaveBeenCalledWith('ninja-naming')
+    expect(mockFetchSuggestions).toHaveBeenCalledWith('ninja-naming', expect.any(String))
   })
 
   it('fetches questions using the campaign ID returned by the API', async () => {

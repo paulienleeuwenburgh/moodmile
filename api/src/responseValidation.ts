@@ -9,6 +9,7 @@ export type QuestionType =
 export interface QuestionConfig {
   questionType: QuestionType
   allowSuggestions: boolean
+  displaySubmissions?: boolean
   required?: boolean
   maxSize?: number
   numberOfVotes?: number
@@ -96,6 +97,14 @@ export function validateQuestion(question: Partial<QuestionConfig>): string[] {
     errors.push('allowSuggestions must be a boolean.')
   } else if (question.questionType !== 'text' && question.allowSuggestions) {
     errors.push('allowSuggestions is only supported for text questions.')
+  }
+
+  if (question.displaySubmissions !== undefined) {
+    if (typeof question.displaySubmissions !== 'boolean') {
+      errors.push('displaySubmissions must be a boolean.')
+    } else if (question.questionType !== 'text') {
+      errors.push('displaySubmissions is only supported for text questions.')
+    }
   }
 
   return errors

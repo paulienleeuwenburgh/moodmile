@@ -63,7 +63,7 @@ function App({ campaignId }: AppProps) {
       const loadedCampaign = await fetchCampaign(campaignId)
       const [loadedQuestions, loadedSuggestions, loadedVoteCounts, loadedResponses] = await Promise.all([
         fetchQuestions(campaignId),
-        fetchSuggestions(campaignId),
+        fetchSuggestions(campaignId, sessionId),
         fetchVoteCounts(campaignId, sessionId),
         fetchQuestionResponses(campaignId),
       ])

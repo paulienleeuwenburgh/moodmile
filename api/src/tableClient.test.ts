@@ -23,6 +23,7 @@ describe('entityToQuestion defaults', () => {
       maxSize: 250,
       numberOfVotes: 0,
       duplicateVotingAllowed: false,
+      displaySubmissions: true,
     })
     expect(validateQuestion(question)).toEqual([])
   })
@@ -45,6 +46,15 @@ describe('entityToQuestion defaults', () => {
     const question = entityToQuestion(questionEntity({ questionType: 'boolean' }))
     expect(question.numberOfVotes).toBeUndefined()
     expect(question.duplicateVotingAllowed).toBeUndefined()
+    expect(question.displaySubmissions).toBeUndefined()
+  })
+
+  it('normalizes displaySubmissions=false for Text questions', () => {
+    const question = entityToQuestion(questionEntity({
+      questionType: 'text',
+      displaySubmissions: 'false' as unknown as boolean,
+    }))
+    expect(question.displaySubmissions).toBe(false)
   })
 
   it('normalizes Azure title-case question types and string-valued scalar properties', () => {

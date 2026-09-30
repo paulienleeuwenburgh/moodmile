@@ -9,12 +9,14 @@ import {
 import { escapeODataString } from '../odata'
 import { getQuestionConfig } from '../campaigns'
 import { validateSuggestion } from '../suggestionValidation'
+import { shouldDisplayAllSubmissions } from '../suggestionVisibility'
 
 async function getSuggestions(
   request: HttpRequest,
   _context: InvocationContext,
 ): Promise<HttpResponseInit> {
   const campaignId = request.query.get('campaignId')
+  const sessionId = request.query.get('sessionId')?.trim() || undefined
   const client = getSuggestionsClient()
   await ensureTableExists(client)
   const suggestions = []
@@ -30,9 +32,28 @@ async function getSuggestions(
   const deletedFilter = `isDeleted ne true`
   const filter = partitionFilter ? `${partitionFilter} and ${deletedFilter}` : deletedFilter
 
+  // Cache question configs per request to avoid repeat lookups for suggestions sharing a question.
+  const questionConfigCache = new Map<string, Awaited<ReturnType<typeof getQuestionConfig>>>()
+
   for await (const entity of client.listEntities<SuggestionEntity>({
     queryOptions: { filter },
   })) {
+    const entityCampaignId = entity.campaignId ?? campaignId ?? ''
+    const questionId = entity.questionId
+    const cacheKey = `${entityCampaignId}|${questionId}`
+    if (!questionConfigCache.has(cacheKey)) {
+      questionConfigCache.set(cacheKey, await getQuestionConfig(entityCampaignId, questionId))
+    }
+    const question = questionConfigCache.get(cacheKey)
+
+    // When a question restricts visibility to the owner's own submissions
+    // (displaySubmissions=false and voting is not enabled), only include
+    // suggestions created by the requesting session.
+    const isVisible = !question || shouldDisplayAllSubmissions(question) || entity.sessionId === sessionId
+    if (!isVisible) {
+      continue
+    }
+
     suggestions.push(entityToSuggestion(entity))
   }
   return {

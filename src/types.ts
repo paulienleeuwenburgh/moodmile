@@ -34,6 +34,12 @@ export interface Question {
   status?: string
   questionType: QuestionType
   allowSuggestions: boolean
+  /**
+   * For text questions with allowSuggestions=true, controls whether submissions from
+   * other users are visible. When false, users only see their own submissions —
+   * unless voting is enabled (numberOfVotes > 0), which always overrules this to true.
+   */
+  displaySubmissions?: boolean
   required?: boolean
   maxSize?: number
   numberOfVotes?: number

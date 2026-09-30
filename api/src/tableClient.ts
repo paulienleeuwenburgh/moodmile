@@ -100,6 +100,7 @@ export interface QuestionEntity {
   status?: string
   questionType: string
   allowSuggestions?: boolean
+  displaySubmissions?: boolean
   required?: boolean
   maxSize?: number
   numberOfVotes?: number
@@ -184,6 +185,7 @@ export function entityToQuestion(entity: TableEntityResult<QuestionEntity>) {
     status: entity.status,
     questionType,
     allowSuggestions: questionType === 'text' ? normalizeBoolean(entity.allowSuggestions, true) : false,
+    displaySubmissions: questionType === 'text' ? normalizeBoolean(entity.displaySubmissions, true) : undefined,
     required: normalizeBoolean(entity.required, false),
     maxSize: questionType === 'text' ? normalizeNumber(entity.maxSize, 250) : undefined,
     numberOfVotes: questionType === 'text' ? normalizeNumber(entity.numberOfVotes, 0)
