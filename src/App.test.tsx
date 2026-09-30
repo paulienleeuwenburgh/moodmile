@@ -1331,6 +1331,7 @@ describe('typed questions', () => {
     await screen.findAllByText('Rocket')
     expect(screen.queryByRole('button', { name: /vote for rocket/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('complementary', { name: /voting rules/i })).not.toBeInTheDocument()
+    expect(document.querySelector('.suggestion-board .vote-btn__count')).not.toBeInTheDocument()
   })
 
   it('shows independent answering controls for every question', async () => {
