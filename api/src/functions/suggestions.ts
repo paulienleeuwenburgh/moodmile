@@ -13,7 +13,7 @@ import { shouldDisplayAllSubmissions } from '../suggestionVisibility'
 
 async function getSuggestions(
   request: HttpRequest,
-  _context: InvocationContext,
+  context: InvocationContext,
 ): Promise<HttpResponseInit> {
   const campaignId = request.query.get('campaignId')
   const sessionId = request.query.get('sessionId')?.trim() || undefined
@@ -42,14 +42,30 @@ async function getSuggestions(
     const questionId = entity.questionId
     const cacheKey = `${entityCampaignId}|${questionId}`
     if (!questionConfigCache.has(cacheKey)) {
-      questionConfigCache.set(cacheKey, await getQuestionConfig(entityCampaignId, questionId))
+      // A single misconfigured question (e.g. a draft still being set up) must not take
+      // down the whole suggestions list. Treat lookup failures as "no visibility rule" so
+      // affected suggestions simply fall back to the default (visible to everyone).
+      let config: Awaited<ReturnType<typeof getQuestionConfig>>
+      try {
+        config = await getQuestionConfig(entityCampaignId, questionId)
+      } catch (err) {
+        context.warn(
+          `Ignoring visibility rule for invalid question "${questionId}" in campaign "${entityCampaignId}": ${err instanceof Error ? err.message : String(err)}`,
+        )
+        config = undefined
+      }
+      questionConfigCache.set(cacheKey, config)
     }
     const question = questionConfigCache.get(cacheKey)
 
     // When a question restricts visibility to the owner's own submissions
     // (displaySubmissions=false and voting is not enabled), only include
-    // suggestions created by the requesting session.
-    const isVisible = !question || shouldDisplayAllSubmissions(question) || entity.sessionId === sessionId
+    // suggestions created by the requesting session. A missing/blank sessionId never
+    // matches, even against suggestions stored without a sessionId of their own.
+    const isVisible =
+      !question ||
+      shouldDisplayAllSubmissions(question) ||
+      (Boolean(sessionId) && entity.sessionId === sessionId)
     if (!isVisible) {
       continue
     }
