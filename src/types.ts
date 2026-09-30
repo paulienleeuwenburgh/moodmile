@@ -38,6 +38,12 @@ export interface Question {
    * For text questions with allowSuggestions=true, controls whether submissions from
    * other users are visible. When false, users only see their own submissions —
    * unless voting is enabled (numberOfVotes > 0), which always overrules this to true.
+   *
+   * NOTE: This is a UI convenience, not an access-control/privacy guarantee. "Own
+   * submissions" are matched against a client-generated, unauthenticated sessionId
+   * (see getSessionId()) sent as a request query parameter — anyone who learns or
+   * guesses another user's sessionId could still read their submissions. Do not treat
+   * displaySubmissions=false as hiding data from a determined or malicious caller.
    */
   displaySubmissions?: boolean
   required?: boolean

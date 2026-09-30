@@ -42,8 +42,12 @@ async function getSuggestions(
   // Resolve the (campaignId, questionId) pair and cache key consistently for every entity,
   // so the lookup phase and the filtering phase below can never drift out of sync — a
   // mismatch there would silently (and incorrectly) trigger the fail-closed path.
+  // Prefer the entity's own partitionKey (stored as "{campaignId}|{questionId}") over the
+  // request's campaignId query param, so suggestions still resolve their real campaign even
+  // when listing across campaigns or if campaignId is omitted from the request.
   function questionCacheKeyFor(entity: TableEntityResult<SuggestionEntity>) {
-    const entityCampaignId = entity.campaignId ?? campaignId ?? ''
+    const partitionCampaignId = entity.partitionKey?.split('|')[0]
+    const entityCampaignId = entity.campaignId ?? partitionCampaignId ?? campaignId ?? ''
     const questionId = entity.questionId
     return { entityCampaignId, questionId, cacheKey: `${entityCampaignId}|${questionId}` }
   }
