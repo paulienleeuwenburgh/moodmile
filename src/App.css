@@ -370,25 +370,15 @@
   background: linear-gradient(160deg, var(--color-primary-light) 0%, #e8f3ff 100%);
   position: relative;
   overflow: hidden;
-  aspect-ratio: 16 / 9;
-  min-height: 220px;
 }
 
 .question-card--selected .question-card__image-wrap {
   background: linear-gradient(160deg, #dfd0ff 0%, #c6e6ff 100%);
 }
 
-.question-card__image-wrap--square {
-  aspect-ratio: 4 / 3;
-}
-
-.question-card__image-wrap--portrait {
-  aspect-ratio: 4 / 5;
-}
-
 .question-card__image {
   width: 100%;
-  height: 100%;
+  height: auto;
   cursor: zoom-in;
   display: block;
   transition: transform 0.18s ease;
@@ -397,17 +387,6 @@
 .question-card:hover .question-card__image,
 .question-card:focus-within .question-card__image {
   transform: scale(1.02);
-}
-
-.question-card__image--landscape,
-.question-card__image--square {
-  object-fit: contain;
-}
-
-.question-card__image--portrait {
-  object-fit: contain;
-  /* Portrait images keep breathing room so the full subject remains visible. */
-  padding: 1rem;
 }
 
 /* Full-width select button under the image */
@@ -1006,14 +985,6 @@
 
   .suggestion-group {
     padding: 1rem;
-  }
-
-  .question-card__image-wrap {
-    min-height: 180px;
-  }
-
-  .question-card__image--portrait {
-    padding: 0.75rem;
   }
 
   .voting-rules {
