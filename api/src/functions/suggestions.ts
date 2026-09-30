@@ -40,7 +40,9 @@ async function getSuggestions(
   }
 
   // Resolve one question config per distinct (campaignId, questionId) pair, in parallel,
-  // instead of sequentially inside the loop below.
+  // instead of sequentially inside the loop below. A `null` cache entry means the question's
+  // config could not be determined (lookup failed, or the question no longer exists) — treated
+  // as fail-closed below, rather than assuming the question allows public visibility.
   const cacheKeys = new Map<string, { entityCampaignId: string; questionId: string }>()
   for (const entity of entities) {
     const entityCampaignId = entity.campaignId ?? campaignId ?? ''
@@ -48,19 +50,19 @@ async function getSuggestions(
     cacheKeys.set(`${entityCampaignId}|${questionId}`, { entityCampaignId, questionId })
   }
 
-  const questionConfigCache = new Map<string, Awaited<ReturnType<typeof getQuestionConfig>> | 'invalid'>()
+  const questionConfigCache = new Map<string, Awaited<ReturnType<typeof getQuestionConfig>> | null>()
   await Promise.all(
     Array.from(cacheKeys.entries()).map(async ([cacheKey, { entityCampaignId, questionId }]) => {
       // A single misconfigured question (e.g. a draft still being set up) must not take
-      // down the whole suggestions list. Mark lookup failures as 'invalid' so we can fail
-      // closed below (hide the question's submissions) rather than assume they're public.
+      // down the whole suggestions list.
       try {
-        questionConfigCache.set(cacheKey, await getQuestionConfig(entityCampaignId, questionId))
+        const config = await getQuestionConfig(entityCampaignId, questionId)
+        questionConfigCache.set(cacheKey, config ?? null)
       } catch (err) {
         context.warn(
           `Hiding submissions for invalid question "${questionId}" in campaign "${entityCampaignId}": ${err instanceof Error ? err.message : String(err)}`,
         )
-        questionConfigCache.set(cacheKey, 'invalid')
+        questionConfigCache.set(cacheKey, null)
       }
     }),
   )
@@ -79,10 +81,11 @@ async function getSuggestions(
     // (displaySubmissions=false and voting is not enabled), only include
     // suggestions created by the requesting session. A missing/blank sessionId never
     // matches, even against suggestions stored without a sessionId of their own.
-    // If the question's config could not be loaded, fail closed and apply the same
-    // own-submissions-only restriction rather than assuming the question is public.
+    // If the question's config could not be determined (lookup failed, or the question
+    // no longer exists), fail closed and apply the same own-submissions-only restriction
+    // rather than assuming the question is public.
     const isVisible =
-      (question !== 'invalid' && (!question || shouldDisplayAllSubmissions(question))) ||
+      (question != null && shouldDisplayAllSubmissions(question)) ||
       (Boolean(sessionId) && entity.sessionId === sessionId)
     if (!isVisible) {
       continue

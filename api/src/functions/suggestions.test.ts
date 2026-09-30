@@ -131,4 +131,16 @@ describe('getSuggestions visibility filtering', () => {
 
     expect(response.jsonBody).toEqual([{ id: 's1', name: 'Mine' }])
   })
+
+  it('fails closed and hides other users submissions when the question no longer exists', async () => {
+    mockListEntities.mockReturnValue(suggestionRows([
+      { rowKey: 's1', name: 'Mine', questionId: 'deleted-question', campaignId: 'c1', sessionId: 'my-session' },
+      { rowKey: 's2', name: 'Theirs', questionId: 'deleted-question', campaignId: 'c1', sessionId: 'other-session' },
+    ]))
+    mockGetQuestionConfig.mockResolvedValue(undefined)
+
+    const response = await getSuggestionsHandler(request('c1', 'my-session'), { warn: vi.fn() })
+
+    expect(response.jsonBody).toEqual([{ id: 's1', name: 'Mine' }])
+  })
 })
