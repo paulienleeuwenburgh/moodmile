@@ -929,7 +929,7 @@ describe('campaign config loaded from storage', () => {
     setupApi([{ ...testSuggestion }])
     render(<App campaignId="ninja-naming" />)
     await screen.findAllByRole('button', { name: /vote for rocket/i })
-    expect(mockFetchSuggestions).toHaveBeenCalledWith('ninja-naming')
+    expect(mockFetchSuggestions).toHaveBeenCalledWith('ninja-naming', expect.any(String))
   })
 
   it('fetches questions using the campaign ID returned by the API', async () => {
@@ -1331,6 +1331,7 @@ describe('typed questions', () => {
     await screen.findAllByText('Rocket')
     expect(screen.queryByRole('button', { name: /vote for rocket/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('complementary', { name: /voting rules/i })).not.toBeInTheDocument()
+    expect(document.querySelector('.suggestion-board .vote-btn__count')).not.toBeInTheDocument()
   })
 
   it('shows independent answering controls for every question', async () => {

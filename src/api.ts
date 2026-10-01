@@ -34,8 +34,12 @@ export async function fetchQuestions(campaignId: string): Promise<Question[]> {
   return apiFetch<Question[]>(`/questions?campaignId=${encodeURIComponent(campaignId)}`)
 }
 
-export async function fetchSuggestions(campaignId: string): Promise<Suggestion[]> {
-  return apiFetch<Suggestion[]>(`/suggestions?campaignId=${encodeURIComponent(campaignId)}`)
+export async function fetchSuggestions(campaignId: string, sessionId?: string): Promise<Suggestion[]> {
+  const params = new URLSearchParams({ campaignId })
+  if (sessionId) {
+    params.set('sessionId', sessionId)
+  }
+  return apiFetch<Suggestion[]>(`/suggestions?${params.toString()}`)
 }
 
 export async function fetchQuestionResponses(campaignId: string): Promise<QuestionResponse[]> {

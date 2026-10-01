@@ -58,7 +58,7 @@ async function getCampaign(
  */
 async function getQuestions(
   request: HttpRequest,
-  _context: InvocationContext,
+  context: InvocationContext,
 ): Promise<HttpResponseInit> {
   const campaignId = request.query.get('campaignId')
   if (!campaignId) {
@@ -75,8 +75,19 @@ async function getQuestions(
     questionIds.push(String(entity.rowKey))
   }
 
-  const questions = (await Promise.all(questionIds.map((questionId) => getQuestionConfig(campaignId, questionId))))
-    .filter((question) => question !== undefined)
+  // A single misconfigured question (e.g. a draft still being set up, with incomplete
+  // options) must not take down the entire questions list for the campaign. Skip
+  // invalid questions individually and keep serving the rest.
+  const questions = (await Promise.all(questionIds.map(async (questionId) => {
+    try {
+      return await getQuestionConfig(campaignId, questionId)
+    } catch (err) {
+      context.warn(
+        `Skipping invalid question "${questionId}" in campaign "${campaignId}": ${err instanceof Error ? err.message : String(err)}`,
+      )
+      return undefined
+    }
+  }))).filter((question) => question !== undefined)
   questions.sort((a, b) => a.sortOrder - b.sortOrder)
 
   return {

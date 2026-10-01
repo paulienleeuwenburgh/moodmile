@@ -96,7 +96,7 @@ export function SuggestionBoard({
                               <span className="vote-btn__icon" aria-hidden="true">−</span>
                             </button>
                           )}
-                        </div> : <span className="vote-btn__count">{suggestion.votes}</span>}
+                        </div> : null}
                       </li>
                     )
                   })}

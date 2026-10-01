@@ -100,6 +100,7 @@ export interface QuestionEntity {
   status?: string
   questionType: string
   allowSuggestions?: boolean
+  displaySubmissions?: boolean
   required?: boolean
   maxSize?: number
   numberOfVotes?: number
@@ -130,12 +131,20 @@ function normalizeBoolean(value: unknown, defaultValue: boolean): boolean {
   return value as boolean
 }
 
+function normalizeNumber(value: unknown, defaultValue: number): number
+function normalizeNumber(value: unknown, defaultValue?: number): number | undefined
 function normalizeNumber(value: unknown, defaultValue?: number): number | undefined {
   if (value === undefined) return defaultValue
   if (typeof value === 'number') return value
-  if (typeof value === 'string' && value.trim() !== '') {
-    const parsed = Number(value)
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    // Azure Table Storage can store an intentionally-cleared field as an empty string
+    // rather than removing the property entirely (e.g. editing an entity in Azure Portal).
+    // Treat that the same as "not set" instead of propagating '' as a bogus numeric value.
+    if (trimmed === '') return defaultValue
+    const parsed = Number(trimmed)
     if (Number.isFinite(parsed)) return parsed
+    return defaultValue
   }
   return value as number
 }
@@ -154,9 +163,12 @@ export function entityToCampaignConfig(entity: TableEntityResult<CampaignEntity>
     title: entity.title,
     description: entity.description,
     status: entity.status,
-    maxVotesTotal: entity.maxVotesTotal,
-    maxVotesPerCategory: entity.maxVotesPerCategory,
-    maxVotesPerCandidate: entity.maxVotesPerCandidate,
+    // 0 = unlimited. Default missing vote-budget fields to unlimited rather than leaving
+    // them undefined, so campaigns created/edited directly in Table Storage without these
+    // properties still behave predictably instead of producing NaN in vote-limit math.
+    maxVotesTotal: normalizeNumber(entity.maxVotesTotal, 0),
+    maxVotesPerCategory: normalizeNumber(entity.maxVotesPerCategory, 0),
+    maxVotesPerCandidate: normalizeNumber(entity.maxVotesPerCandidate, 0),
     createdAt: entity.createdAt,
     updatedAt: entity.updatedAt,
     bannerImageUrl: entity.bannerImageUrl,
@@ -184,6 +196,7 @@ export function entityToQuestion(entity: TableEntityResult<QuestionEntity>) {
     status: entity.status,
     questionType,
     allowSuggestions: questionType === 'text' ? normalizeBoolean(entity.allowSuggestions, true) : false,
+    displaySubmissions: questionType === 'text' ? normalizeBoolean(entity.displaySubmissions, true) : undefined,
     required: normalizeBoolean(entity.required, false),
     maxSize: questionType === 'text' ? normalizeNumber(entity.maxSize, 250) : undefined,
     numberOfVotes: questionType === 'text' ? normalizeNumber(entity.numberOfVotes, 0)

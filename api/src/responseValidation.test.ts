@@ -49,6 +49,14 @@ describe('typed question validation', () => {
     expect(validateQuestion({ ...base, questionType: 'boolean', allowSuggestions: true }))
       .toContain('allowSuggestions is only supported for text questions.')
   })
+
+  it('validates displaySubmissions type and applicability', () => {
+    expect(validateQuestion({ ...base, questionType: 'text', displaySubmissions: 'yes' } as unknown as QuestionConfig))
+      .toContain('displaySubmissions must be a boolean.')
+    expect(validateQuestion({ ...base, questionType: 'boolean', displaySubmissions: false }))
+      .toContain('displaySubmissions is only supported for text questions.')
+    expect(validateQuestion({ ...base, questionType: 'text', displaySubmissions: false })).toEqual([])
+  })
 })
 
 describe('typed response validation', () => {
