@@ -136,9 +136,15 @@ function normalizeNumber(value: unknown, defaultValue?: number): number | undefi
 function normalizeNumber(value: unknown, defaultValue?: number): number | undefined {
   if (value === undefined) return defaultValue
   if (typeof value === 'number') return value
-  if (typeof value === 'string' && value.trim() !== '') {
-    const parsed = Number(value)
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    // Azure Table Storage can store an intentionally-cleared field as an empty string
+    // rather than removing the property entirely (e.g. editing an entity in Azure Portal).
+    // Treat that the same as "not set" instead of propagating '' as a bogus numeric value.
+    if (trimmed === '') return defaultValue
+    const parsed = Number(trimmed)
     if (Number.isFinite(parsed)) return parsed
+    return defaultValue
   }
   return value as number
 }

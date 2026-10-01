@@ -118,4 +118,19 @@ describe('entityToQuestion defaults', () => {
     expect(entityToQuestion(questionEntity({ questionType: 'Categorical' })).questionType).toBe('categorical')
     expect(entityToQuestion(questionEntity({ questionType: 'unknown' })).questionType).toBe('unknown')
   })
+
+  it('treats blank numericMin/numericMax strings as unset, not as "0" or ""', () => {
+    // Azure Table Storage (e.g. via the Portal's "Edit entity" UI) can store an
+    // intentionally-blank field as an empty string rather than omitting the property.
+    // For a non-numeric question this must not be mistaken for an actual numeric bound,
+    // which would otherwise fail validation and cause the question to be hidden entirely.
+    const question = entityToQuestion(questionEntity({
+      questionType: 'text',
+      numericMin: '' as unknown as number,
+      numericMax: '' as unknown as number,
+    }))
+    expect(question.numericMin).toBeUndefined()
+    expect(question.numericMax).toBeUndefined()
+    expect(validateQuestion(question)).toEqual([])
+  })
 })
